@@ -1,0 +1,1 @@
+{"version":3,"file":"segment.type.d.ts","sourceRoot":"","sources":["../../../src/ts/types/segment.type.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,mBAAmB,CAAC;AAE9C,MAAM,WAAW,OAAO;IACtB,KAAK,EAAE,SAAS,GAAG,IAAI,CAAC;IACxB,IAAI,EAAE,MAAM,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;IACd,GAAG,EAAE,MAAM,CAAC;CACb"}

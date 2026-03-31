@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperDate — Demo</title>
+  <link rel="stylesheet" href="../dist/super-date.min.css">
+  <script src="../dist/super-date.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    h1 span { color: #38bdf8; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #94a3b8;
+    }
+
+    input[type="date"] {
+      height: 30px;
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1.5px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="date"]:focus {
+      border-color: #38bdf8;
+    }
+
+    .superdate-wrapper {
+      width: 100%;
+    }
+
+    /* Override SuperDate CSS variables to match dark theme */
+    .superdate-overlay {
+      --superdate-active-bg: #0ea5e9;
+      --superdate-active-color: #fff;
+      --superdate-placeholder-color: #475569;
+      --superdate-sep-color: #64748b;
+      color: #e2e8f0;
+    }
+
+    .note {
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    code {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      color: #7dd3fc;
+    }
+
+    button {
+      align-self: flex-start;
+      padding: 8px 18px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #38bdf8; }
+
+    #output {
+      font-size: 0.85rem;
+      color: #7dd3fc;
+      font-family: monospace;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Super<span>Date</span> Demo</h1>
+
+  <div class="field">
+    <label>Format: dd/MM/yyyy (mặc định)</label>
+    <input type="date" class="sd" id="d1" />
+  </div>
+
+  <div class="field">
+    <label>Format: MM-dd-yyyy (via data-attribute)</label>
+    <input type="date" class="sd" id="d2" data-date-format="MM-dd-yyyy" />
+  </div>
+
+  <div class="field">
+    <label>Format: yyyy/MM/dd</label>
+    <input type="date" class="sd" id="d3" data-date-format="yyyy/MM/dd" />
+  </div>
+
+  <div class="field">
+    <label>Dynamically added input</label>
+    <div id="dynamic-container"></div>
+    <button id="add-btn" style="margin-top:6px">+ Thêm input mới</button>
+  </div>
+
+  <div class="field">
+    <label>Read values</label>
+    <button id="read-btn">Đọc giá trị</button>
+    <div id="output"></div>
+  </div>
+
+  <p class="note">
+    Keyboard: <code>↑ ↓</code> thay đổi giá trị, <code>← →</code> di chuyển segment,
+    <code>Tab</code> chuyển segment tiếp theo, <code>0-9</code> gõ trực tiếp.
+    Hỗ trợ copy/paste ngày tháng.
+  </p>
+</div>
+
+<script type="module">
+  // Bind tất cả .sd input hiện tại và tương lai
+  window.onload = () => {
+    SuperDate.bind('.sd', { format: 'dd/MM/yyyy' });
+  }
+
+  // Demo: thêm input mới động
+  let count = 0;
+  document.getElementById('add-btn').addEventListener('click', () => {
+    count++;
+    const wrap = document.createElement('div');
+    wrap.style.marginTop = '6px';
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.className = 'sd';
+    input.placeholder = `Dynamic #${count}`;
+    input.dataset.dateFormat = count % 2 === 0 ? 'MM/dd/yyyy' : 'dd/MM/yyyy';
+    wrap.appendChild(input);
+    document.getElementById('dynamic-container').appendChild(wrap);
+  });
+
+  // Read
+  document.getElementById('read-btn').addEventListener('click', () => {
+    const vals = ['d1','d2','d3'].map(id => {
+      const el = document.getElementById(id);
+      return `#${id}: ${el.value || '(trống)'}`;
+    });
+    document.getElementById('output').textContent = vals.join(' | ');
+  });
+</script>
+</body>
+</html>
