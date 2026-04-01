@@ -30,9 +30,12 @@ const FIND_PROPERTIES = [
 ];
 
 const DATA_PROPERTIES = [
-  'dateFormat',
   'token',
-  'idx'
+  'idx',
+  'format',
+  'dateFormat',
+  'timeFormat',
+  'dateTimeDelimiter',
 ];
 
 const PUBLIC_PROPERTIES = [

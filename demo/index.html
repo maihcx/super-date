@@ -26,7 +26,7 @@
       border-radius: 16px;
       padding: 2rem;
       width: 100%;
-      max-width: 480px;
+      max-width: 520px;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
@@ -38,6 +38,17 @@
       color: #f1f5f9;
     }
     h1 span { color: #38bdf8; }
+
+    h2 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #38bdf8;
+      border-top: 1px solid #334155;
+      padding-top: 1rem;
+      margin-top: 0.25rem;
+    }
 
     .field {
       display: flex;
@@ -53,7 +64,9 @@
       color: #94a3b8;
     }
 
-    input[type="date"] {
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"] {
       height: 30px;
       width: 100%;
       padding: 10px 12px;
@@ -67,15 +80,14 @@
       transition: border-color 0.2s;
     }
 
-    input[type="date"]:focus {
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    input[type="datetime-local"]:focus {
       border-color: #38bdf8;
     }
 
-    .superdate-wrapper {
-      width: 100%;
-    }
+    .superdate-wrapper { width: 100%; }
 
-    /* Override SuperDate CSS variables to match dark theme */
     .superdate-overlay {
       --superdate-active-bg: #0ea5e9;
       --superdate-active-color: #fff;
@@ -119,6 +131,7 @@
       color: #7dd3fc;
       font-family: monospace;
       min-height: 1.2em;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -126,27 +139,61 @@
 <div class="card">
   <h1>Super<span>Date</span> Demo</h1>
 
+  <!-- ── DATE inputs ──────────────────────────────────────────────── -->
+  <h2>input type="date"</h2>
+
   <div class="field">
-    <label>Format: dd/MM/yyyy (mặc định)</label>
+    <label>dd/MM/yyyy (mặc định)</label>
     <input type="date" class="sd" id="d1" />
   </div>
 
   <div class="field">
-    <label>Format: MM-dd-yyyy (via data-attribute)</label>
+    <label>MM-dd-yyyy (data-date-format)</label>
     <input type="date" class="sd" id="d2" data-date-format="MM-dd-yyyy" />
   </div>
 
   <div class="field">
-    <label>Format: yyyy/MM/dd</label>
+    <label>yyyy/MM/dd</label>
     <input type="date" class="sd" id="d3" data-date-format="yyyy/MM/dd" />
   </div>
 
+  <!-- ── TIME inputs ──────────────────────────────────────────────── -->
+  <h2>input type="time"</h2>
+
   <div class="field">
-    <label>Dynamically added input</label>
+    <label>HH:mm (mặc định)</label>
+    <input type="time" class="sd" id="t1" />
+  </div>
+
+  <div class="field">
+    <label>HH:mm:ss (data-time-format)</label>
+    <input type="time" class="sd" id="t2" data-time-format="HH:mm:ss" />
+  </div>
+
+  <!-- ── DATETIME-LOCAL inputs ─────────────────────────────────────── -->
+  <h2>input type="datetime-local"</h2>
+
+  <div class="field">
+    <label>dd/MM/yyyy HH:mm (space delimiter)</label>
+    <input type="datetime-local" class="sd" id="dt1" />
+  </div>
+
+  <div class="field">
+    <label>yyyy-MM-dd | HH:mm:ss (custom delimiter via data-attribute)</label>
+    <input type="datetime-local" class="sd" id="dt2"
+      data-date-format="yyyy-MM-dd"
+      data-time-format="HH:mm:ss"
+      data-date-time-delimiter=" | " />
+  </div>
+
+  <!-- ── Dynamic ──────────────────────────────────────────────────── -->
+  <div class="field">
+    <label>Dynamic input</label>
     <div id="dynamic-container"></div>
     <button id="add-btn" style="margin-top:6px">+ Thêm input mới</button>
   </div>
 
+  <!-- ── Read values ──────────────────────────────────────────────── -->
   <div class="field">
     <label>Read values</label>
     <button id="read-btn">Đọc giá trị</button>
@@ -154,40 +201,40 @@
   </div>
 
   <p class="note">
-    Keyboard: <code>↑ ↓</code> thay đổi giá trị, <code>← →</code> di chuyển segment,
-    <code>Tab</code> chuyển segment tiếp theo, <code>0-9</code> gõ trực tiếp.
-    Hỗ trợ copy/paste ngày tháng.
+    Keyboard: <code>↑ ↓</code> thay đổi, <code>← →</code> / <code>Tab</code> di chuyển segment,
+    <code>0-9</code> gõ trực tiếp. Hỗ trợ copy/paste.
   </p>
 </div>
 
 <script type="module">
-  // Bind tất cả .sd input hiện tại và tương lai
   window.onload = () => {
-    SuperDate.bind('.sd', { format: 'dd/MM/yyyy' });
+    SuperDate.bind('.sd', {
+      format: 'dd/MM/yyyy',
+      timeFormat: 'HH:mm',
+      dateTimeDelimiter: ' ',
+    });
   }
 
-  // Demo: thêm input mới động
   let count = 0;
   document.getElementById('add-btn').addEventListener('click', () => {
     count++;
+    const types = ['date', 'time', 'datetime-local'];
     const wrap = document.createElement('div');
     wrap.style.marginTop = '6px';
     const input = document.createElement('input');
-    input.type = 'date';
+    input.type = types[count % 3];
     input.className = 'sd';
-    input.placeholder = `Dynamic #${count}`;
-    input.dataset.dateFormat = count % 2 === 0 ? 'MM/dd/yyyy' : 'dd/MM/yyyy';
     wrap.appendChild(input);
     document.getElementById('dynamic-container').appendChild(wrap);
   });
 
-  // Read
   document.getElementById('read-btn').addEventListener('click', () => {
-    const vals = ['d1','d2','d3'].map(id => {
+    const ids = ['d1','d2','d3','t1','t2','dt1','dt2'];
+    const vals = ids.map(id => {
       const el = document.getElementById(id);
-      return `#${id}: ${el.value || '(trống)'}`;
+      return `#${id} (${el.type}): ${el.value || '(trống)'}`;
     });
-    document.getElementById('output').textContent = vals.join(' | ');
+    document.getElementById('output').textContent = vals.join('\n');
   });
 </script>
 </body>

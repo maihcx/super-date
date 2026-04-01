@@ -1,10 +1,11 @@
 /**
  * overlay.ts — builds and updates the visual overlay that sits on top of
- * the hidden native date input.
+ * the hidden native date/time input.
  */
 
 import { Segment } from '../types/segment.type';
 import { tokenValue, tokenPlaceholder } from './format';
+import { InputKind } from './format';
 
 const CALENDAR_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -13,6 +14,13 @@ const CALENDAR_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill=
   <line x1="16" y1="2" x2="16" y2="6"/>
   <line x1="8" y1="2" x2="8" y2="6"/>
   <line x1="3" y1="10" x2="21" y2="10"/>
+</svg>`;
+
+const CLOCK_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+  stroke-linejoin="round" aria-hidden="true">
+  <circle cx="12" cy="12" r="10"/>
+  <polyline points="12 6 12 12 16 14"/>
 </svg>`;
 
 export interface OverlayElements {
@@ -30,6 +38,7 @@ export function buildOverlay(
   segments: Segment[],
   onSegmentClick: (idx: number) => void,
   onIconClick: () => void,
+  kind: InputKind = 'date',
 ): OverlayElements {
   // ── Wrapper ─────────────────────────────────────────────────────────────────
   const wrapper = document.createElement('div');
@@ -41,7 +50,6 @@ export function buildOverlay(
 
   input.classList.add('superdate-input');
   input.style.display = 'block';
-  input.style.width = '100%';
   input.style.boxSizing = 'border-box';
 
   // ── Overlay ──────────────────────────────────────────────────────────────────
@@ -49,7 +57,7 @@ export function buildOverlay(
   overlay.className = 'superdate-overlay';
 
   const segEls: HTMLElement[] = [];
-  
+
   segments.forEach((seg, i) => {
     const el = document.createElement('span');
     el.className = 'superdate-seg';
@@ -66,10 +74,10 @@ export function buildOverlay(
     segEls.push(el);
   });
 
-  // ── Calendar icon ────────────────────────────────────────────────────────────
+  // ── Icon (calendar for date/datetime-local, clock for time) ─────────────────
   const icon = document.createElement('span');
   icon.className = 'superdate-icon';
-  icon.innerHTML = CALENDAR_ICON_SVG;
+  icon.innerHTML = kind === 'time' ? CLOCK_ICON_SVG : CALENDAR_ICON_SVG;
   icon.addEventListener('click', (e) => {
     e.stopPropagation();
     onIconClick();
@@ -82,7 +90,7 @@ export function buildOverlay(
 }
 
 /**
- * Re-render all segment spans from the current date value.
+ * Re-render all segment spans from the current date/time value.
  */
 export function renderSegments(
   segments: Segment[],
@@ -92,7 +100,12 @@ export function renderSegments(
   segments.forEach((seg, i) => {
     const el = segEls[i];
     if (!seg.token) {
-      el.textContent = seg.text;
+      // Use innerHTML with &nbsp; for whitespace-only literals so CSS doesn't collapse them
+      if (seg.text.trim() === '') {
+        el.innerHTML = seg.text.replace(/ /g, '&nbsp;');
+      } else {
+        el.textContent = seg.text;
+      }
       return;
     }
     const val = tokenValue(seg.token, date);

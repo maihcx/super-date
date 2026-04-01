@@ -1,12 +1,17 @@
 /**
- * instance.ts — SuperDateInstance manages one enhanced date input:
+ * instance.ts — SuperDateInstance manages one enhanced date/time input:
  * overlay rendering, keyboard/mouse/paste interaction, and lifecycle.
+ * Supports input[type="date"], input[type="time"], and input[type="datetime-local"].
  */
 
 import { DateToken } from '../types/date-token.type';
 import { Segment } from '../types/segment.type';
 import {
   parseFormat,
+  buildDateTimeFormat,
+  getInputKind,
+  InputKind,
+  isTimeToken,
   tokenMaxDigits,
   tokenMaxValue,
   tokenMinValue,
@@ -33,6 +38,9 @@ declare global {
 
 export class SuperDateInstance {
   private input: HTMLInputElement;
+  private kind: InputKind;
+
+  /** Combined display format (for datetime-local: "dd/MM/yyyy HH:mm") */
   private format: string;
   private segments: Segment[];
 
@@ -44,29 +52,45 @@ export class SuperDateInstance {
   private typingBuffer: string = '';
 
   // ── Selection state ────────────────────────────────────────────────────────
-  // selAnchor = token-seg index where mousedown started (-1 = no drag)
-  // selEnd    = token-seg index currently under cursor during drag
-  // Selection mode: selAnchor !== -1  →  activeTokenIdx is always -1
   private selAnchor: number = -1;
-  private selEnd:    number = -1;
+  private selEnd: number = -1;
   private _justDragged = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
-  private _onKeyDown:     (e: Event) => void;
-  private _onPaste:       (e: Event) => void;
-  private _onChange:      () => void;
-  private _onBlur:        (e: Event) => void;
-  private _onWrapClick:   (e: Event) => void;
-  private _onWrapDblClick:(e: Event) => void;
-  private _onMouseDown:   (e: Event) => void;
-  private _onMouseMove:   (e: Event) => void;
-  private _onMouseUp:     (e: Event) => void;
-  private _mutObs:        MutationObserver;
+  private _onKeyDown: (e: Event) => void;
+  private _onPaste: (e: Event) => void;
+  private _onChange: () => void;
+  private _onBlur: (e: Event) => void;
+  private _onWrapClick: (e: Event) => void;
+  private _onWrapDblClick: (e: Event) => void;
+  private _onMouseDown: (e: Event) => void;
+  private _onMouseMove: (e: Event) => void;
+  private _onMouseUp: (e: Event) => void;
+  private _mutObs: MutationObserver;
   private _destroyed = false;
 
-  constructor(input: HTMLInputElement, globalFormat: string) {
+  constructor(
+    input: HTMLInputElement,
+    globalDateFormat: string,
+    globalTimeFormat: string = 'HH:mm',
+    globalDelimiter: string = ' ',
+  ) {
     this.input = input;
-    this.format = input.dataset.dateFormat ?? globalFormat;
+    this.kind = getInputKind(input);
+
+    // Resolve effective formats from data-attributes or globals
+    const dateFormat = input.dataset.dateFormat ?? globalDateFormat;
+    const timeFormat = input.dataset.timeFormat ?? globalTimeFormat;
+    const delimiter = input.dataset.dateTimeDelimiter ?? globalDelimiter;
+
+    if (this.kind === 'datetime-local') {
+      this.format = buildDateTimeFormat(dateFormat, timeFormat, delimiter);
+    } else if (this.kind === 'time') {
+      this.format = timeFormat;
+    } else {
+      this.format = dateFormat;
+    }
+
     this.segments = parseFormat(this.format);
 
     const elements = buildOverlay(
@@ -74,23 +98,24 @@ export class SuperDateInstance {
       this.segments,
       (idx) => this.activateSegment(idx),
       () => this.input.showPicker?.(),
+      this.kind,
     );
 
     this.wrapper = elements.wrapper;
     this.overlay = elements.overlay;
-    this.segEls  = elements.segEls;
+    this.segEls = elements.segEls;
 
     this.render();
 
-    this._onKeyDown      = (e) => this.handleKeyDown(e as KeyboardEvent);
-    this._onPaste        = (e) => this.handlePaste(e as ClipboardEvent);
-    this._onChange       = () => this.render();
-    this._onBlur         = (e) => this.handleBlur(e as FocusEvent);
-    this._onWrapClick    = (e) => this.handleWrapperClick(e as MouseEvent);
+    this._onKeyDown = (e) => this.handleKeyDown(e as KeyboardEvent);
+    this._onPaste = (e) => this.handlePaste(e as ClipboardEvent);
+    this._onChange = () => this.render();
+    this._onBlur = (e) => this.handleBlur(e as FocusEvent);
+    this._onWrapClick = (e) => this.handleWrapperClick(e as MouseEvent);
     this._onWrapDblClick = (e) => this.handleWrapperDblClick(e as MouseEvent);
-    this._onMouseDown    = (e) => this.handleMouseDown(e as MouseEvent);
-    this._onMouseMove    = (e) => this.handleMouseMove(e as MouseEvent);
-    this._onMouseUp      = (e) => this.handleMouseUp(e as MouseEvent);
+    this._onMouseDown = (e) => this.handleMouseDown(e as MouseEvent);
+    this._onMouseMove = (e) => this.handleMouseMove(e as MouseEvent);
+    this._onMouseUp = (e) => this.handleMouseUp(e as MouseEvent);
     this._mutObs = new MutationObserver(() => { if (!this._destroyed) this.render(); });
 
     this.attachEvents();
@@ -142,27 +167,49 @@ export class SuperDateInstance {
     if (this.activeTokenIdx !== -1) {
       const token = this.segments[this.activeTokenIdx].token;
       if (token) {
-        if (this.getBufferValue(token) == '0') {
+        let bufferVal = this.getBufferValue(token);
+        if (bufferVal == '0') {
           const now = new Date();
-          let nowValue: number;
+          let nowValue: number | string;
           switch (token) {
-            case 'dd': case 'd':   nowValue = now.getDate();           break;
-            case 'MM': case 'M':   nowValue = now.getMonth() + 1;      break;
-            case 'yyyy':           nowValue = now.getFullYear();        break;
-            case 'yy':             nowValue = now.getFullYear() % 100; break;
+            case 'dd': case 'd': nowValue = now.getDate(); break;
+            case 'MM': case 'M': nowValue = now.getMonth() + 1; break;
+            case 'yyyy': nowValue = now.getFullYear(); break;
+            case 'yy': nowValue = now.getFullYear() % 100; break;
+            case 'HH': case 'H': nowValue = now.getHours(); break;
+            case 'hh': case 'h': nowValue = now.getHours() % 12 || 12; break;
+            case 'mm': nowValue = now.getMinutes(); break;
+            case 'ss': nowValue = now.getSeconds(); break;
           }
+          nowValue = nowValue.toString();
+          if (nowValue.length < tokenMaxDigits(token)) {
+            nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
+          }
+
           this.typingBuffer = '';
-          this.typeDigit(token, nowValue.toString());
+          this.typeDigit(token, nowValue, true);
         }
-        
+        else {
+          if (bufferVal.length < tokenMaxDigits(token)) {
+            bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+
+            this.typingBuffer = '';
+            this.typeDigit(token, bufferVal, true);
+          }
+        }
+
         const date = readInputDate(this.input);
         if (date) {
           let current: number;
           switch (token) {
-            case 'dd': case 'd':   current = date.getDate();           break;
-            case 'MM': case 'M':   current = date.getMonth() + 1;      break;
-            case 'yyyy':           current = date.getFullYear();        break;
-            case 'yy':             current = date.getFullYear() % 100; break;
+            case 'dd': case 'd': current = date.getDate(); break;
+            case 'MM': case 'M': current = date.getMonth() + 1; break;
+            case 'yyyy': current = date.getFullYear(); break;
+            case 'yy': current = date.getFullYear() % 100; break;
+            case 'HH': case 'H': current = date.getHours(); break;
+            case 'hh': case 'h': current = date.getHours() % 12 || 12; break;
+            case 'mm': current = date.getMinutes(); break;
+            case 'ss': current = date.getSeconds(); break;
           }
           if (current! < tokenMinValue(token)) {
             this.commitTokenValue(token, tokenMinValue(token));
@@ -178,44 +225,37 @@ export class SuperDateInstance {
   }
 
   // ── Selection via active class ────────────────────────────────────────────
-  // We reuse the existing `.active` style — every token seg in the range
-  // gets the active class exactly as if the user had clicked each one.
-  // This means no new CSS class is needed.
 
   private hasSelection(): boolean {
     return this.selAnchor !== -1;
   }
 
-  /** Paint active class on all token segs in [min(anchor,end), max(anchor,end)]. */
   private paintSelection(anchor: number, end: number): void {
     const from = Math.min(anchor, end);
-    const to   = Math.max(anchor, end);
+    const to = Math.max(anchor, end);
     this.segEls.forEach((el, i) => {
       el.classList.toggle('active', this.segments[i].token !== null && i >= from && i <= to);
     });
   }
 
-  /** Update selEnd and repaint. */
   private extendSelectionTo(idx: number): void {
     this.selEnd = idx;
     this.paintSelection(this.selAnchor, this.selEnd);
   }
 
-  /** Select every token segment (double-click / Ctrl+A). */
   private selectAll(): void {
     const first = this.firstTokenIdx();
-    const last  = this.lastTokenIdx();
+    const last = this.lastTokenIdx();
     if (first === -1) return;
     this.activeTokenIdx = -1;
     this.selAnchor = first;
-    this.selEnd    = last;
+    this.selEnd = last;
     this.paintSelection(first, last);
   }
 
-  /** Clear selection state and remove active class from all segs. */
   private endSelection(): void {
     this.selAnchor = -1;
-    this.selEnd    = -1;
+    this.selEnd = -1;
     deactivateAll(this.segEls);
   }
 
@@ -226,7 +266,7 @@ export class SuperDateInstance {
     if (!date || !this.hasSelection()) return;
 
     const from = Math.min(this.selAnchor, this.selEnd);
-    const to   = Math.max(this.selAnchor, this.selEnd);
+    const to = Math.max(this.selAnchor, this.selEnd);
     let text = '';
     for (let i = from; i <= to; i++) {
       const seg = this.segments[i];
@@ -249,16 +289,16 @@ export class SuperDateInstance {
     if (!this.hasSelection()) return;
 
     const from = Math.min(this.selAnchor, this.selEnd);
-    const to   = Math.max(this.selAnchor, this.selEnd);
-    const allTokenCount  = this.segments.filter(s => s.token).length;
-    let   selTokenCount  = 0;
+    const to = Math.max(this.selAnchor, this.selEnd);
+    const allTokenCount = this.segments.filter(s => s.token).length;
+    let selTokenCount = 0;
     for (let i = from; i <= to; i++) {
       if (this.segments[i]?.token) selTokenCount++;
     }
 
     if (selTokenCount === allTokenCount) {
       this.input.value = '';
-      this.input.dispatchEvent(new Event('input',  { bubbles: true }));
+      this.input.dispatchEvent(new Event('input', { bubbles: true }));
       this.input.dispatchEvent(new Event('change', { bubbles: true }));
       this.render();
     }
@@ -269,7 +309,6 @@ export class SuperDateInstance {
 
   // ── Mouse drag ───────────────────────────────────────────────────────────
 
-  /** Return the nearest token-seg index from a mouse event, or -1. */
   private tokenIdxFromEvent(e: MouseEvent): number {
     const el = (e.target as HTMLElement).closest('[data-idx]') as HTMLElement | null;
     if (!el) return -1;
@@ -278,11 +317,11 @@ export class SuperDateInstance {
   }
 
   private handleMouseDown(e: MouseEvent): void {
-    if (e.detail >= 2) return; // dblclick handled separately
+    if (e.detail >= 2) return;
     const idx = this.tokenIdxFromEvent(e);
     if (idx === -1) return;
     this.selAnchor = idx;
-    this.selEnd    = idx;
+    this.selEnd = idx;
   }
 
   private handleMouseMove(e: MouseEvent): void {
@@ -291,7 +330,6 @@ export class SuperDateInstance {
     if (idx === -1) return;
     if (idx === this.selEnd) return;
 
-    // First real move → enter selection mode, kill single-seg focus
     if (this.activeTokenIdx !== -1) {
       this.activeTokenIdx = -1;
       this.typingBuffer = '';
@@ -301,19 +339,17 @@ export class SuperDateInstance {
 
   private handleMouseUp(_e: MouseEvent): void {
     if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
-      // Plain click (no drag) → activate that seg
       const idx = this.selAnchor;
       this.selAnchor = -1;
-      this.selEnd    = -1;
+      this.selEnd = -1;
       this.activateSegment(idx);
     } else if (this.selAnchor !== this.selEnd) {
-      // Drag ended — set flag so the upcoming click event doesn't clear selection
       this._justDragged = true;
       this.input.focus({ preventScroll: true });
     }
   }
 
-  // ── Double-click: select all ─────────────────────────────────────────────
+  // ── Double-click ─────────────────────────────────────────────────────────
 
   private handleWrapperDblClick(e: MouseEvent): void {
     e.preventDefault();
@@ -333,13 +369,11 @@ export class SuperDateInstance {
   }
 
   private handleWrapperClick(e: MouseEvent): void {
-    // Suppress the click that fires immediately after a drag ends
     if (this._justDragged) {
       this._justDragged = false;
       return;
     }
     const target = e.target as HTMLElement;
-    // Click on the blank wrapper background (not on a seg) → first seg
     if (target === this.wrapper || target === this.input || target === this.overlay) {
       this.endSelection();
       this.activateSegment(this.firstTokenIdx());
@@ -349,14 +383,12 @@ export class SuperDateInstance {
   // ── Keyboard ──────────────────────────────────────────────────────────────
 
   private handleKeyDown(e: KeyboardEvent): void {
-    // Ctrl+A
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
       this.selectAll();
       return;
     }
 
-    // Ctrl+C
     if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
       if (this.hasSelection()) {
         e.preventDefault();
@@ -365,14 +397,12 @@ export class SuperDateInstance {
       return;
     }
 
-    // Backspace / Delete on selection
     if ((e.key === 'Backspace' || e.key === 'Delete') && this.hasSelection()) {
       e.preventDefault();
       this.deleteSelection();
       return;
     }
 
-    // Escape
     if (e.key === 'Escape') {
       if (this.hasSelection()) {
         this.endSelection();
@@ -392,7 +422,7 @@ export class SuperDateInstance {
         break;
       case 'ArrowRight':
         e.preventDefault();
-        { const n = this.nextTokenIdx(this.activeTokenIdx, 1);  if (n !== -1) this.activateSegment(n); }
+        { const n = this.nextTokenIdx(this.activeTokenIdx, 1); if (n !== -1) this.activateSegment(n); }
         break;
       case 'ArrowLeft':
         e.preventDefault();
@@ -433,49 +463,58 @@ export class SuperDateInstance {
 
   // ── Digit typing ──────────────────────────────────────────────────────────
 
-  private typeDigit(token: DateToken, digit: string): void {
+  private typeDigit(token: DateToken, digit: string, skipNext: boolean = false): void {
     this.typingBuffer += digit;
-    const num      = parseInt(this.typingBuffer, 10);
-    const maxVal   = tokenMaxValue(token);
+    const num = parseInt(this.typingBuffer, 10);
+    const maxVal = tokenMaxValue(token);
     const maxDigit = tokenMaxDigits(token);
 
-    const fullLength  = this.typingBuffer.length >= maxDigit;
+    const fullLength = this.typingBuffer.length >= maxDigit;
 
     if (fullLength) {
-      const minVal  = tokenMinValue(token);
+      const minVal = tokenMinValue(token);
       const clamped = Math.max(minVal, Math.min(maxVal, num));
       this.commitTokenValue(token, clamped);
       this.typingBuffer = '';
-      const next = this.nextTokenIdx(this.activeTokenIdx, 1);
-      if (next !== -1) setTimeout(() => this.activateSegment(next), 0);
+      if (!skipNext) {
+        const next = this.nextTokenIdx(this.activeTokenIdx, 1);
+        if (next !== -1) setTimeout(() => this.activateSegment(next), 0);
+      }
     } else {
       this.renderBuffer();
     }
   }
 
   private renderBuffer(): void {
-    const el    = this.segEls[this.activeTokenIdx];
+    const el = this.segEls[this.activeTokenIdx];
     const token = this.segments[this.activeTokenIdx].token!;
     if (this.typingBuffer) {
       el.textContent = this.typingBuffer;
       el.classList.remove('empty');
     } else {
-      el.textContent = token === 'yyyy' ? 'yyyy'
-                     : token === 'yy'   ? 'yy'
-                     : token === 'MM' || token === 'M' ? (token === 'MM' ? 'mm' : 'm')
-                     : token === 'dd' ? 'dd' : 'd';
+      // Restore placeholder
+      switch (token) {
+        case 'yyyy': el.textContent = 'yyyy'; break;
+        case 'yy': el.textContent = 'yy'; break;
+        case 'MM': el.textContent = 'mm'; break;
+        case 'M': el.textContent = 'm'; break;
+        case 'dd': el.textContent = 'dd'; break;
+        case 'd': el.textContent = 'd'; break;
+        case 'HH': el.textContent = 'HH'; break;
+        case 'H': el.textContent = 'H'; break;
+        case 'hh': el.textContent = 'hh'; break;
+        case 'h': el.textContent = 'h'; break;
+        case 'mm': el.textContent = 'mm'; break;
+        case 'ss': el.textContent = 'ss'; break;
+      }
       el.classList.add('empty');
     }
   }
 
   private getBufferValue(token: DateToken): string {
-    if (this.typingBuffer) {
-      return this.typingBuffer;
-    }
-
+    if (this.typingBuffer) return this.typingBuffer;
     const date = readInputDate(this.input);
     if (!date) return '';
-
     return tokenValue(token, date);
   }
 
@@ -487,15 +526,19 @@ export class SuperDateInstance {
     let current: number;
 
     switch (token) {
-      case 'dd': case 'd':   current = base.getDate();           break;
-      case 'MM': case 'M':   current = base.getMonth() + 1;      break;
-      case 'yyyy':           current = base.getFullYear();        break;
-      case 'yy':             current = base.getFullYear() % 100; break;
+      case 'dd': case 'd': current = base.getDate(); break;
+      case 'MM': case 'M': current = base.getMonth() + 1; break;
+      case 'yyyy': current = base.getFullYear(); break;
+      case 'yy': current = base.getFullYear() % 100; break;
+      case 'HH': case 'H': current = base.getHours(); break;
+      case 'hh': case 'h': current = base.getHours() % 12 || 12; break;
+      case 'mm': current = base.getMinutes(); break;
+      case 'ss': current = base.getSeconds(); break;
     }
 
     const minV = tokenMinValue(token);
     const maxV = tokenMaxValue(token);
-    let next   = current! + delta;
+    let next = current! + delta;
 
     if (next < minV) next = maxV;
     if (next > maxV) next = minV;
@@ -514,7 +557,7 @@ export class SuperDateInstance {
   private handlePaste(e: ClipboardEvent): void {
     e.preventDefault();
     const text = e.clipboardData?.getData('text/plain') ?? '';
-    const date = parsePastedDate(text.trim(), this.format);
+    const date = parsePastedDate(text.trim(), this.format, this.kind);
     if (date) {
       writeInputDate(this.input, date);
       this.render();
@@ -525,15 +568,15 @@ export class SuperDateInstance {
 
   private attachEvents(): void {
     this.input.addEventListener('keydown', this._onKeyDown);
-    this.input.addEventListener('paste',   this._onPaste);
-    this.input.addEventListener('change',  this._onChange);
-    this.input.addEventListener('blur',    this._onBlur);
+    this.input.addEventListener('paste', this._onPaste);
+    this.input.addEventListener('change', this._onChange);
+    this.input.addEventListener('blur', this._onBlur);
 
-    this.wrapper.addEventListener('click',    this._onWrapClick);
+    this.wrapper.addEventListener('click', this._onWrapClick);
     this.wrapper.addEventListener('dblclick', this._onWrapDblClick);
     this.overlay.addEventListener('mousedown', this._onMouseDown);
     this.overlay.addEventListener('mousemove', this._onMouseMove);
-    this.overlay.addEventListener('mouseup',   this._onMouseUp);
+    this.overlay.addEventListener('mouseup', this._onMouseUp);
 
     this._mutObs.observe(this.input, {
       attributes: true,
@@ -554,20 +597,20 @@ export class SuperDateInstance {
     this._mutObs.disconnect();
 
     this.input.removeEventListener('keydown', this._onKeyDown);
-    this.input.removeEventListener('paste',   this._onPaste);
-    this.input.removeEventListener('change',  this._onChange);
-    this.input.removeEventListener('blur',    this._onBlur);
+    this.input.removeEventListener('paste', this._onPaste);
+    this.input.removeEventListener('change', this._onChange);
+    this.input.removeEventListener('blur', this._onBlur);
 
-    this.wrapper.removeEventListener('click',    this._onWrapClick);
+    this.wrapper.removeEventListener('click', this._onWrapClick);
     this.wrapper.removeEventListener('dblclick', this._onWrapDblClick);
     this.overlay.removeEventListener('mousedown', this._onMouseDown);
     this.overlay.removeEventListener('mousemove', this._onMouseMove);
-    this.overlay.removeEventListener('mouseup',   this._onMouseUp);
+    this.overlay.removeEventListener('mouseup', this._onMouseUp);
 
     this.input.classList.remove('superdate-input');
     this.input.style.display = '';
-    this.input.style.width   = '';
-    this.input.style.color   = '';
+    this.input.style.width = '';
+    this.input.style.color = '';
     this.wrapper.replaceWith(this.input);
   }
 }

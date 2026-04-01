@@ -1,4 +1,4 @@
-/*! SuperDate v1.3.0 | MIT License */
+/*! SuperDate v0.0.0 | MIT License */
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
@@ -6,16 +6,26 @@
 })(this, (function () { 'use strict';
 
     /**
-     * format.ts — format string parsing, token metadata, and date read/write helpers.
+     * format.ts — format string parsing, token metadata, and date/time read/write helpers.
      */
+    function getInputKind(input) {
+        const t = input.type;
+        if (t === 'time' || t === 'datetime-local')
+            return t;
+        return 'date';
+    }
     // ─── Format parsing ───────────────────────────────────────────────────────────
     /**
      * Parse a format string into an ordered array of Segment descriptors.
-     * Recognised tokens: yyyy, yy, MM, M, dd, d.
+     * Date tokens: yyyy, yy, MM, M, dd, d
+     * Time tokens: HH, H, hh, h, mm, ss
      * Everything else is treated as a literal separator.
+     *
+     * NOTE: token regex order matters — longer tokens must appear before shorter ones.
      */
     function parseFormat(format) {
-        const TOKEN_RE = /yyyy|yy|YYYY|YY|MM|M|dd|DD|d|D/g;
+        // yyyy/yy must precede MM/M; HH before H; hh before h; dd before d
+        const TOKEN_RE = /yyyy|yy|YYYY|YY|MM|M|HH|H|hh|h|mm|ss|dd|DD|d|D/g;
         const segments = [];
         let cursor = 0;
         let match;
@@ -38,17 +48,33 @@
         }
         return segments;
     }
+    /**
+     * Build a combined format string for datetime-local inputs.
+     * e.g. dateFormat="dd/MM/yyyy", timeFormat="HH:mm", delimiter=" "
+     * → "dd/MM/yyyy HH:mm"
+     */
+    function buildDateTimeFormat(dateFormat, timeFormat, delimiter) {
+        return `${dateFormat}${delimiter}${timeFormat}`;
+    }
     // ─── Token metadata ───────────────────────────────────────────────────────────
     function tokenValue(token, date) {
         if (!date)
             return '';
         switch (token) {
+            // ── Date ──
             case 'dd': return pad(date.getDate(), 2);
             case 'd': return String(date.getDate());
             case 'MM': return pad(date.getMonth() + 1, 2);
             case 'M': return String(date.getMonth() + 1);
             case 'yyyy': return pad(date.getFullYear(), 4);
             case 'yy': return pad(date.getFullYear() % 100, 2);
+            // ── Time ──
+            case 'HH': return pad(date.getHours(), 2);
+            case 'H': return String(date.getHours());
+            case 'hh': return pad(to12h(date.getHours()), 2);
+            case 'h': return String(to12h(date.getHours()));
+            case 'mm': return pad(date.getMinutes(), 2);
+            case 'ss': return pad(date.getSeconds(), 2);
         }
     }
     function tokenPlaceholder(token) {
@@ -59,6 +85,12 @@
             case 'M': return 'm';
             case 'yyyy': return 'yyyy';
             case 'yy': return 'yy';
+            case 'HH': return 'HH';
+            case 'H': return 'H';
+            case 'hh': return 'hh';
+            case 'h': return 'h';
+            case 'mm': return 'mm';
+            case 'ss': return 'ss';
         }
     }
     function tokenMaxDigits(token) {
@@ -69,6 +101,12 @@
             case 'M': return 2;
             case 'yyyy': return 4;
             case 'yy': return 2;
+            case 'HH':
+            case 'H':
+            case 'hh':
+            case 'h': return 2;
+            case 'mm': return 2;
+            case 'ss': return 2;
         }
     }
     function tokenMaxValue(token) {
@@ -79,6 +117,12 @@
             case 'M': return 12;
             case 'yyyy': return 9999;
             case 'yy': return 99;
+            case 'HH':
+            case 'H': return 23;
+            case 'hh':
+            case 'h': return 12;
+            case 'mm': return 59;
+            case 'ss': return 59;
         }
     }
     function tokenMinValue(token) {
@@ -89,15 +133,24 @@
             case 'M': return 1;
             case 'yyyy': return 1;
             case 'yy': return 0;
+            case 'HH':
+            case 'H': return 0;
+            case 'hh':
+            case 'h': return 1;
+            case 'mm': return 0;
+            case 'ss': return 0;
         }
     }
-    // ─── Date construction ────────────────────────────────────────────────────────
+    // ─── Date/time construction ───────────────────────────────────────────────────
     /** Clamp a year/month/day combination to a real calendar date. */
     function buildDate(current, token, newRaw) {
         const base = current ?? new Date();
         let y = base.getFullYear();
-        let m = base.getMonth() + 1; // 1-based
+        let mo = base.getMonth() + 1; // 1-based
         let d = base.getDate();
+        let h = base.getHours();
+        let mi = base.getMinutes();
+        let s = base.getSeconds();
         switch (token) {
             case 'dd':
             case 'd':
@@ -105,7 +158,7 @@
                 break;
             case 'MM':
             case 'M':
-                m = newRaw;
+                mo = newRaw;
                 break;
             case 'yyyy':
                 y = newRaw;
@@ -113,18 +166,59 @@
             case 'yy':
                 y = 2000 + newRaw;
                 break;
+            case 'HH':
+            case 'H':
+                h = newRaw;
+                break;
+            case 'hh':
+            case 'h':
+                h = from12h(newRaw, h);
+                break;
+            case 'mm':
+                mi = newRaw;
+                break;
+            case 'ss':
+                s = newRaw;
+                break;
         }
         // Clamp day to valid range for the given month/year
-        const maxDay = new Date(y, m, 0).getDate();
+        const maxDay = new Date(y, mo, 0).getDate();
         d = Math.max(1, Math.min(d, maxDay));
-        return new Date(y, m - 1, d);
+        return new Date(y, mo - 1, d, h, mi, s);
     }
     // ─── Input read/write ─────────────────────────────────────────────────────────
-    /** Read a date-only ISO string (yyyy-MM-dd) from the hidden input. */
+    /** Read a Date from input. Supports date, time, and datetime-local inputs. */
     function readInputDate(input) {
         if (!input.value)
             return null;
-        const parts = input.value.split('-');
+        const kind = getInputKind(input);
+        if (kind === 'date') {
+            return parseDateISO(input.value);
+        }
+        if (kind === 'time') {
+            return parseTimeISO(input.value);
+        }
+        // datetime-local: "yyyy-MM-ddTHH:mm" or "yyyy-MM-ddTHH:mm:ss"
+        return parseDateTimeISO(input.value);
+    }
+    /** Write a Date back as ISO string appropriate for the input type, and fire native events. */
+    function writeInputDate(input, date) {
+        const kind = getInputKind(input);
+        if (kind === 'date') {
+            input.value = formatDateISO(date);
+        }
+        else if (kind === 'time') {
+            input.value = formatTimeISO(date);
+        }
+        else {
+            input.value = formatDateTimeISO(date);
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    // ─── ISO format helpers ───────────────────────────────────────────────────────
+    function parseDateISO(value) {
+        const parts = value.split('-');
         if (parts.length !== 3)
             return null;
         const [y, m, d] = parts.map(Number);
@@ -132,34 +226,74 @@
             return null;
         return new Date(y, m - 1, d);
     }
-    /** Write a Date back as ISO date (yyyy-MM-dd) and fire native events. */
-    function writeInputDate(input, date) {
+    function parseTimeISO(value) {
+        // "HH:mm" or "HH:mm:ss"
+        const parts = value.split(':');
+        if (parts.length < 2)
+            return null;
+        const [h, mi, s = 0] = parts.map(Number);
+        if (isNaN(h) || isNaN(mi))
+            return null;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, mi, s);
+    }
+    function parseDateTimeISO(value) {
+        // "yyyy-MM-ddTHH:mm" or "yyyy-MM-ddTHH:mm:ss"
+        const [datePart, timePart] = value.split('T');
+        if (!datePart || !timePart)
+            return null;
+        const dateOnly = parseDateISO(datePart);
+        if (!dateOnly)
+            return null;
+        const timeParts = timePart.split(':').map(Number);
+        const [h = 0, mi = 0, s = 0] = timeParts;
+        return new Date(dateOnly.getFullYear(), dateOnly.getMonth(), dateOnly.getDate(), h, mi, s);
+    }
+    function formatDateISO(date) {
         const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        input.value = `${y}-${m}-${d}`;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+        const m = pad(date.getMonth() + 1, 2);
+        const d = pad(date.getDate(), 2);
+        return `${y}-${m}-${d}`;
+    }
+    function formatTimeISO(date) {
+        const h = pad(date.getHours(), 2);
+        const mi = pad(date.getMinutes(), 2);
+        const s = pad(date.getSeconds(), 2);
+        return `${h}:${mi}:${s}`;
+    }
+    function formatDateTimeISO(date) {
+        return `${formatDateISO(date)}T${formatTimeISO(date)}`;
     }
     // ─── Paste parser ─────────────────────────────────────────────────────────────
-    const PASTE_FALLBACKS = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'd.M.yyyy', 'MM-dd-yyyy'];
+    const PASTE_DATE_FALLBACKS = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'd.M.yyyy', 'MM-dd-yyyy'];
+    const PASTE_TIME_FALLBACKS = ['HH:mm:ss', 'HH:mm', 'H:mm'];
+    const PASTE_DATETIME_FALLBACKS = ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm', 'dd/MM/yyyy HH:mm'];
     /**
-     * Try to parse a pasted string using `preferredFormat` first,
-     * then common fallback formats. Returns null if all attempts fail.
+     * Try to parse a pasted string for date, time, or datetime-local inputs.
+     * Uses preferredFormat first, then common fallbacks.
      */
-    function parsePastedDate(text, preferredFormat) {
-        const formats = [preferredFormat, ...PASTE_FALLBACKS.filter(f => f !== preferredFormat)];
+    function parsePastedDate(text, preferredFormat, kind = 'date') {
+        let fallbacks;
+        if (kind === 'time')
+            fallbacks = PASTE_TIME_FALLBACKS;
+        else if (kind === 'datetime-local')
+            fallbacks = PASTE_DATETIME_FALLBACKS;
+        else
+            fallbacks = PASTE_DATE_FALLBACKS;
+        const formats = [preferredFormat, ...fallbacks.filter(f => f !== preferredFormat)];
         for (const fmt of formats) {
-            const d = parseWithFormat(text, fmt);
+            const d = parseWithFormat(text, fmt, kind);
             if (d)
                 return d;
         }
         return null;
     }
-    function parseWithFormat(text, format) {
+    function parseWithFormat(text, format, kind) {
         const segs = parseFormat(format);
         let pos = 0;
-        let d = 1, m = 1, y = new Date().getFullYear();
+        const now = new Date();
+        let d = now.getDate(), mo = now.getMonth() + 1, y = now.getFullYear();
+        let h = 0, mi = 0, s = 0;
         for (const seg of segs) {
             if (pos >= text.length)
                 break;
@@ -185,7 +319,7 @@
                     break;
                 case 'MM':
                 case 'M':
-                    m = num;
+                    mo = num;
                     break;
                 case 'yyyy':
                     y = num;
@@ -193,20 +327,55 @@
                 case 'yy':
                     y = 2000 + num;
                     break;
+                case 'HH':
+                case 'H':
+                    h = num;
+                    break;
+                case 'hh':
+                case 'h':
+                    h = from12h(num, h);
+                    break;
+                case 'mm':
+                    mi = num;
+                    break;
+                case 'ss':
+                    s = num;
+                    break;
             }
         }
-        if (m < 1 || m > 12 || d < 1 || d > 31)
-            return null;
-        return new Date(y, m - 1, d);
+        if (kind === 'date' || kind === 'datetime-local') {
+            if (mo < 1 || mo > 12 || d < 1 || d > 31)
+                return null;
+        }
+        if (kind === 'time') {
+            if (h < 0 || h > 23 || mi < 0 || mi > 59)
+                return null;
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, mi, s);
+        }
+        return new Date(y, mo - 1, d, h, mi, s);
     }
     // ─── Utility ──────────────────────────────────────────────────────────────────
     function pad(n, len) {
         return String(n).padStart(len, '0');
     }
+    function to12h(h24) {
+        if (h24 === 0)
+            return 12;
+        if (h24 > 12)
+            return h24 - 12;
+        return h24;
+    }
+    function from12h(h12, currentH24) {
+        // Preserve AM/PM based on current hour
+        const isPM = currentH24 >= 12;
+        if (h12 === 12)
+            return isPM ? 12 : 0;
+        return isPM ? h12 + 12 : h12;
+    }
 
     /**
      * overlay.ts — builds and updates the visual overlay that sits on top of
-     * the hidden native date input.
+     * the hidden native date/time input.
      */
     const CALENDAR_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -216,11 +385,17 @@
   <line x1="8" y1="2" x2="8" y2="6"/>
   <line x1="3" y1="10" x2="21" y2="10"/>
 </svg>`;
+    const CLOCK_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+  stroke-linejoin="round" aria-hidden="true">
+  <circle cx="12" cy="12" r="10"/>
+  <polyline points="12 6 12 12 16 14"/>
+</svg>`;
     /**
      * Wrap `input` in a `.superdate-wrapper`, inject the overlay element and
      * segment spans. Returns references to every created element.
      */
-    function buildOverlay(input, segments, onSegmentClick, onIconClick) {
+    function buildOverlay(input, segments, onSegmentClick, onIconClick, kind = 'date') {
         // ── Wrapper ─────────────────────────────────────────────────────────────────
         const wrapper = document.createElement('div');
         wrapper.className = 'superdate-wrapper';
@@ -229,7 +404,6 @@
         wrapper.appendChild(input);
         input.classList.add('superdate-input');
         input.style.display = 'block';
-        input.style.width = '100%';
         input.style.boxSizing = 'border-box';
         // ── Overlay ──────────────────────────────────────────────────────────────────
         const overlay = document.createElement('div');
@@ -250,10 +424,10 @@
             overlay.appendChild(el);
             segEls.push(el);
         });
-        // ── Calendar icon ────────────────────────────────────────────────────────────
+        // ── Icon (calendar for date/datetime-local, clock for time) ─────────────────
         const icon = document.createElement('span');
         icon.className = 'superdate-icon';
-        icon.innerHTML = CALENDAR_ICON_SVG;
+        icon.innerHTML = kind === 'time' ? CLOCK_ICON_SVG : CALENDAR_ICON_SVG;
         icon.addEventListener('click', (e) => {
             e.stopPropagation();
             onIconClick();
@@ -263,13 +437,19 @@
         return { wrapper, overlay, segEls };
     }
     /**
-     * Re-render all segment spans from the current date value.
+     * Re-render all segment spans from the current date/time value.
      */
     function renderSegments(segments, segEls, date) {
         segments.forEach((seg, i) => {
             const el = segEls[i];
             if (!seg.token) {
-                el.textContent = seg.text;
+                // Use innerHTML with &nbsp; for whitespace-only literals so CSS doesn't collapse them
+                if (seg.text.trim() === '') {
+                    el.innerHTML = seg.text.replace(/ /g, '&nbsp;');
+                }
+                else {
+                    el.textContent = seg.text;
+                }
                 return;
             }
             const val = tokenValue(seg.token, date);
@@ -295,26 +475,37 @@
     }
 
     /**
-     * instance.ts — SuperDateInstance manages one enhanced date input:
+     * instance.ts — SuperDateInstance manages one enhanced date/time input:
      * overlay rendering, keyboard/mouse/paste interaction, and lifecycle.
+     * Supports input[type="date"], input[type="time"], and input[type="datetime-local"].
      */
     const INSTANCE_KEY = '__superdate__';
     class SuperDateInstance {
-        constructor(input, globalFormat) {
+        constructor(input, globalDateFormat, globalTimeFormat = 'HH:mm', globalDelimiter = ' ') {
             this.activeTokenIdx = -1;
             this.typingBuffer = '';
             // ── Selection state ────────────────────────────────────────────────────────
-            // selAnchor = token-seg index where mousedown started (-1 = no drag)
-            // selEnd    = token-seg index currently under cursor during drag
-            // Selection mode: selAnchor !== -1  →  activeTokenIdx is always -1
             this.selAnchor = -1;
             this.selEnd = -1;
             this._justDragged = false;
             this._destroyed = false;
             this.input = input;
-            this.format = input.dataset.dateFormat ?? globalFormat;
+            this.kind = getInputKind(input);
+            // Resolve effective formats from data-attributes or globals
+            const dateFormat = input.dataset.dateFormat ?? globalDateFormat;
+            const timeFormat = input.dataset.timeFormat ?? globalTimeFormat;
+            const delimiter = input.dataset.dateTimeDelimiter ?? globalDelimiter;
+            if (this.kind === 'datetime-local') {
+                this.format = buildDateTimeFormat(dateFormat, timeFormat, delimiter);
+            }
+            else if (this.kind === 'time') {
+                this.format = timeFormat;
+            }
+            else {
+                this.format = dateFormat;
+            }
             this.segments = parseFormat(this.format);
-            const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => this.input.showPicker?.());
+            const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => this.input.showPicker?.(), this.kind);
             this.wrapper = elements.wrapper;
             this.overlay = elements.overlay;
             this.segEls = elements.segEls;
@@ -373,7 +564,8 @@
             if (this.activeTokenIdx !== -1) {
                 const token = this.segments[this.activeTokenIdx].token;
                 if (token) {
-                    if (this.getBufferValue(token) == '0') {
+                    let bufferVal = this.getBufferValue(token);
+                    if (bufferVal == '0') {
                         const now = new Date();
                         let nowValue;
                         switch (token) {
@@ -391,9 +583,34 @@
                             case 'yy':
                                 nowValue = now.getFullYear() % 100;
                                 break;
+                            case 'HH':
+                            case 'H':
+                                nowValue = now.getHours();
+                                break;
+                            case 'hh':
+                            case 'h':
+                                nowValue = now.getHours() % 12 || 12;
+                                break;
+                            case 'mm':
+                                nowValue = now.getMinutes();
+                                break;
+                            case 'ss':
+                                nowValue = now.getSeconds();
+                                break;
+                        }
+                        nowValue = nowValue.toString();
+                        if (nowValue.length < tokenMaxDigits(token)) {
+                            nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
                         }
                         this.typingBuffer = '';
-                        this.typeDigit(token, nowValue.toString());
+                        this.typeDigit(token, nowValue, true);
+                    }
+                    else {
+                        if (bufferVal.length < tokenMaxDigits(token)) {
+                            bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+                            this.typingBuffer = '';
+                            this.typeDigit(token, bufferVal, true);
+                        }
                     }
                     const date = readInputDate(this.input);
                     if (date) {
@@ -413,6 +630,20 @@
                             case 'yy':
                                 current = date.getFullYear() % 100;
                                 break;
+                            case 'HH':
+                            case 'H':
+                                current = date.getHours();
+                                break;
+                            case 'hh':
+                            case 'h':
+                                current = date.getHours() % 12 || 12;
+                                break;
+                            case 'mm':
+                                current = date.getMinutes();
+                                break;
+                            case 'ss':
+                                current = date.getSeconds();
+                                break;
                         }
                         if (current < tokenMinValue(token)) {
                             this.commitTokenValue(token, tokenMinValue(token));
@@ -426,13 +657,9 @@
             deactivateAll(this.segEls);
         }
         // ── Selection via active class ────────────────────────────────────────────
-        // We reuse the existing `.active` style — every token seg in the range
-        // gets the active class exactly as if the user had clicked each one.
-        // This means no new CSS class is needed.
         hasSelection() {
             return this.selAnchor !== -1;
         }
-        /** Paint active class on all token segs in [min(anchor,end), max(anchor,end)]. */
         paintSelection(anchor, end) {
             const from = Math.min(anchor, end);
             const to = Math.max(anchor, end);
@@ -440,12 +667,10 @@
                 el.classList.toggle('active', this.segments[i].token !== null && i >= from && i <= to);
             });
         }
-        /** Update selEnd and repaint. */
         extendSelectionTo(idx) {
             this.selEnd = idx;
             this.paintSelection(this.selAnchor, this.selEnd);
         }
-        /** Select every token segment (double-click / Ctrl+A). */
         selectAll() {
             const first = this.firstTokenIdx();
             const last = this.lastTokenIdx();
@@ -456,7 +681,6 @@
             this.selEnd = last;
             this.paintSelection(first, last);
         }
-        /** Clear selection state and remove active class from all segs. */
         endSelection() {
             this.selAnchor = -1;
             this.selEnd = -1;
@@ -507,7 +731,6 @@
             this.activeTokenIdx = -1;
         }
         // ── Mouse drag ───────────────────────────────────────────────────────────
-        /** Return the nearest token-seg index from a mouse event, or -1. */
         tokenIdxFromEvent(e) {
             const el = e.target.closest('[data-idx]');
             if (!el)
@@ -517,7 +740,7 @@
         }
         handleMouseDown(e) {
             if (e.detail >= 2)
-                return; // dblclick handled separately
+                return;
             const idx = this.tokenIdxFromEvent(e);
             if (idx === -1)
                 return;
@@ -532,7 +755,6 @@
                 return;
             if (idx === this.selEnd)
                 return;
-            // First real move → enter selection mode, kill single-seg focus
             if (this.activeTokenIdx !== -1) {
                 this.activeTokenIdx = -1;
                 this.typingBuffer = '';
@@ -541,19 +763,17 @@
         }
         handleMouseUp(_e) {
             if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
-                // Plain click (no drag) → activate that seg
                 const idx = this.selAnchor;
                 this.selAnchor = -1;
                 this.selEnd = -1;
                 this.activateSegment(idx);
             }
             else if (this.selAnchor !== this.selEnd) {
-                // Drag ended — set flag so the upcoming click event doesn't clear selection
                 this._justDragged = true;
                 this.input.focus({ preventScroll: true });
             }
         }
-        // ── Double-click: select all ─────────────────────────────────────────────
+        // ── Double-click ─────────────────────────────────────────────────────────
         handleWrapperDblClick(e) {
             e.preventDefault();
             this.activeTokenIdx = -1;
@@ -569,13 +789,11 @@
             }
         }
         handleWrapperClick(e) {
-            // Suppress the click that fires immediately after a drag ends
             if (this._justDragged) {
                 this._justDragged = false;
                 return;
             }
             const target = e.target;
-            // Click on the blank wrapper background (not on a seg) → first seg
             if (target === this.wrapper || target === this.input || target === this.overlay) {
                 this.endSelection();
                 this.activateSegment(this.firstTokenIdx());
@@ -583,13 +801,11 @@
         }
         // ── Keyboard ──────────────────────────────────────────────────────────────
         handleKeyDown(e) {
-            // Ctrl+A
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
                 e.preventDefault();
                 this.selectAll();
                 return;
             }
-            // Ctrl+C
             if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
                 if (this.hasSelection()) {
                     e.preventDefault();
@@ -597,13 +813,11 @@
                 }
                 return;
             }
-            // Backspace / Delete on selection
             if ((e.key === 'Backspace' || e.key === 'Delete') && this.hasSelection()) {
                 e.preventDefault();
                 this.deleteSelection();
                 return;
             }
-            // Escape
             if (e.key === 'Escape') {
                 if (this.hasSelection()) {
                     this.endSelection();
@@ -669,7 +883,7 @@
             }
         }
         // ── Digit typing ──────────────────────────────────────────────────────────
-        typeDigit(token, digit) {
+        typeDigit(token, digit, skipNext = false) {
             this.typingBuffer += digit;
             const num = parseInt(this.typingBuffer, 10);
             const maxVal = tokenMaxValue(token);
@@ -680,9 +894,11 @@
                 const clamped = Math.max(minVal, Math.min(maxVal, num));
                 this.commitTokenValue(token, clamped);
                 this.typingBuffer = '';
-                const next = this.nextTokenIdx(this.activeTokenIdx, 1);
-                if (next !== -1)
-                    setTimeout(() => this.activateSegment(next), 0);
+                if (!skipNext) {
+                    const next = this.nextTokenIdx(this.activeTokenIdx, 1);
+                    if (next !== -1)
+                        setTimeout(() => this.activateSegment(next), 0);
+                }
             }
             else {
                 this.renderBuffer();
@@ -696,17 +912,51 @@
                 el.classList.remove('empty');
             }
             else {
-                el.textContent = token === 'yyyy' ? 'yyyy'
-                    : token === 'yy' ? 'yy'
-                        : token === 'MM' || token === 'M' ? (token === 'MM' ? 'mm' : 'm')
-                            : token === 'dd' ? 'dd' : 'd';
+                // Restore placeholder
+                switch (token) {
+                    case 'yyyy':
+                        el.textContent = 'yyyy';
+                        break;
+                    case 'yy':
+                        el.textContent = 'yy';
+                        break;
+                    case 'MM':
+                        el.textContent = 'mm';
+                        break;
+                    case 'M':
+                        el.textContent = 'm';
+                        break;
+                    case 'dd':
+                        el.textContent = 'dd';
+                        break;
+                    case 'd':
+                        el.textContent = 'd';
+                        break;
+                    case 'HH':
+                        el.textContent = 'HH';
+                        break;
+                    case 'H':
+                        el.textContent = 'H';
+                        break;
+                    case 'hh':
+                        el.textContent = 'hh';
+                        break;
+                    case 'h':
+                        el.textContent = 'h';
+                        break;
+                    case 'mm':
+                        el.textContent = 'mm';
+                        break;
+                    case 'ss':
+                        el.textContent = 'ss';
+                        break;
+                }
                 el.classList.add('empty');
             }
         }
         getBufferValue(token) {
-            if (this.typingBuffer) {
+            if (this.typingBuffer)
                 return this.typingBuffer;
-            }
             const date = readInputDate(this.input);
             if (!date)
                 return '';
@@ -732,6 +982,20 @@
                 case 'yy':
                     current = base.getFullYear() % 100;
                     break;
+                case 'HH':
+                case 'H':
+                    current = base.getHours();
+                    break;
+                case 'hh':
+                case 'h':
+                    current = base.getHours() % 12 || 12;
+                    break;
+                case 'mm':
+                    current = base.getMinutes();
+                    break;
+                case 'ss':
+                    current = base.getSeconds();
+                    break;
             }
             const minV = tokenMinValue(token);
             const maxV = tokenMaxValue(token);
@@ -751,7 +1015,7 @@
         handlePaste(e) {
             e.preventDefault();
             const text = e.clipboardData?.getData('text/plain') ?? '';
-            const date = parsePastedDate(text.trim(), this.format);
+            const date = parsePastedDate(text.trim(), this.format, this.kind);
             if (date) {
                 writeInputDate(this.input, date);
                 this.render();
@@ -802,23 +1066,18 @@
     /**
      * registry.ts — SuperDateRegistry tracks bound selectors and uses a single
      * MutationObserver to auto-initialise matching inputs added to the DOM later.
-     *
-     * Lifecycle:
-     * - destroy(el)  marks the element with [data-superdate-destroyed] so the
-     *   MutationObserver won't re-bind it automatically.
-     * - bind(selector) / init(el) remove that marker first, so calling bind or
-     *   init again on previously-destroyed elements works as expected.
+     * Supports input[type="date"], input[type="time"], and input[type="datetime-local"].
      */
     let observer = null;
     let bindings = [];
     const DESTROYED_ATTR = 'data-superdate-destroyed';
+    const SUPPORTED_TYPES = new Set(['date', 'time', 'datetime-local']);
     function isDestroyed(el) {
         return el.hasAttribute(DESTROYED_ATTR);
     }
     function markDestroyed(el) {
         el.setAttribute(DESTROYED_ATTR, '');
     }
-    /** Remove the destroyed marker from all elements matching a selector. */
     function clearDestroyedBySelector(selector) {
         document.querySelectorAll(selector).forEach(el => {
             el.removeAttribute(DESTROYED_ATTR);
@@ -827,27 +1086,29 @@
     function defaultOpts(options = {}) {
         return {
             format: options.format ?? 'dd/MM/yyyy',
+            timeFormat: options.timeFormat ?? 'HH:mm',
+            dateTimeDelimiter: options.dateTimeDelimiter ?? ' ',
             locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
         };
     }
     function initAll(selector, opts) {
         document.querySelectorAll(selector).forEach(el => {
-            if (el.type !== 'date' || el[INSTANCE_KEY] || isDestroyed(el))
+            if (!SUPPORTED_TYPES.has(el.type) || el[INSTANCE_KEY] || isDestroyed(el))
                 return;
-            el[INSTANCE_KEY] = new SuperDateInstance(el, opts.format);
+            el[INSTANCE_KEY] = new SuperDateInstance(el, opts.format, opts.timeFormat, opts.dateTimeDelimiter);
         });
     }
     function tryInit(node) {
         for (const binding of bindings) {
             if (node instanceof HTMLInputElement && node.matches(binding.selector)) {
-                if (node.type === 'date' && !node[INSTANCE_KEY] && !isDestroyed(node)) {
-                    node[INSTANCE_KEY] = new SuperDateInstance(node, binding.options.format);
+                if (SUPPORTED_TYPES.has(node.type) && !node[INSTANCE_KEY] && !isDestroyed(node)) {
+                    node[INSTANCE_KEY] = new SuperDateInstance(node, binding.options.format, binding.options.timeFormat, binding.options.dateTimeDelimiter);
                 }
             }
             node.querySelectorAll(binding.selector).forEach(el => {
-                if (el.type !== 'date' || el[INSTANCE_KEY] || isDestroyed(el))
+                if (!SUPPORTED_TYPES.has(el.type) || el[INSTANCE_KEY] || isDestroyed(el))
                     return;
-                el[INSTANCE_KEY] = new SuperDateInstance(el, binding.options.format);
+                el[INSTANCE_KEY] = new SuperDateInstance(el, binding.options.format, binding.options.timeFormat, binding.options.dateTimeDelimiter);
             });
         }
     }
@@ -868,18 +1129,13 @@
             this.name = '';
         }
         /**
-         * Bind SuperDate to all current **and future** `<input type="date">`
-         * elements matching `selector`. Safe to call multiple times with
-         * different selectors.
-         *
-         * Clears the destroyed marker from all matching elements so that
-         * previously-destroyed inputs in this selector group can be re-bound.
+         * Bind SuperDate to all current **and future** `<input type="date">`,
+         * `<input type="time">`, and `<input type="datetime-local">` elements
+         * matching `selector`. Safe to call multiple times with different selectors.
          */
         bind(selector, options = {}) {
             const opts = defaultOpts(options);
             bindings.push({ selector, options: opts });
-            // Remove destroyed flag for every element matching this selector
-            // so bind() acts as an intentional re-enable for that group.
             clearDestroyedBySelector(selector);
             initAll(selector, opts);
             if (!observer)
@@ -889,17 +1145,13 @@
         /**
          * Manually enhance a single element.
          * Returns the existing instance if one is already attached.
-         *
-         * Clears the destroyed marker so an explicitly destroyed element can
-         * be re-initialised by calling init() again.
          */
         init(el, options = {}) {
             if (el[INSTANCE_KEY])
                 return el[INSTANCE_KEY];
-            // Clear destroyed flag — caller explicitly wants this element enhanced.
             el.removeAttribute(DESTROYED_ATTR);
             const opts = defaultOpts(options);
-            const instance = new SuperDateInstance(el, opts.format);
+            const instance = new SuperDateInstance(el, opts.format, opts.timeFormat, opts.dateTimeDelimiter);
             el[INSTANCE_KEY] = instance;
             return instance;
         }
@@ -932,7 +1184,7 @@
         globalThis.GLOBAL_SDATE = new SuperDateRegistry();
     }
     var SuperDate = globalThis.GLOBAL_SDATE;
-    SuperDate.version = "1.3.0";
+    SuperDate.version = "0.0.0";
     SuperDate.name = "SuperDate";
 
     return SuperDate;
