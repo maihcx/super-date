@@ -1,4 +1,4 @@
-/*! SuperDate v0.0.1 | MIT License */
+/*! SuperDate v1.3.0 | MIT License */
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
@@ -94,7 +94,7 @@
     // ─── Date construction ────────────────────────────────────────────────────────
     /** Clamp a year/month/day combination to a real calendar date. */
     function buildDate(current, token, newRaw) {
-        const base = current !== null && current !== void 0 ? current : new Date();
+        const base = current ?? new Date();
         let y = base.getFullYear();
         let m = base.getMonth() + 1; // 1-based
         let d = base.getDate();
@@ -302,13 +302,12 @@
     const INSTANCE_KEY = '__superdate__';
     class SuperDateInstance {
         constructor(input, globalFormat) {
-            var _a;
             this.activeTokenIdx = -1;
             this.typingBuffer = '';
             this.input = input;
-            this.format = (_a = input.dataset.dateFormat) !== null && _a !== void 0 ? _a : globalFormat;
+            this.format = input.dataset.dateFormat ?? globalFormat;
             this.segments = parseFormat(this.format);
-            const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => { var _a, _b; return (_b = (_a = this.input).showPicker) === null || _b === void 0 ? void 0 : _b.call(_a); });
+            const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => this.input.showPicker?.());
             this.wrapper = elements.wrapper;
             this.overlay = elements.overlay;
             this.segEls = elements.segEls;
@@ -452,7 +451,7 @@
         // ── Step (↑ ↓) ───────────────────────────────────────────────────────────────
         stepValue(token, delta) {
             const date = readInputDate(this.input);
-            const base = date !== null && date !== void 0 ? date : new Date();
+            const base = date ?? new Date();
             let current;
             switch (token) {
                 case 'dd':
@@ -486,9 +485,8 @@
         }
         // ── Paste ────────────────────────────────────────────────────────────────────
         handlePaste(e) {
-            var _a, _b;
             e.preventDefault();
-            const text = (_b = (_a = e.clipboardData) === null || _a === void 0 ? void 0 : _a.getData('text/plain')) !== null && _b !== void 0 ? _b : '';
+            const text = e.clipboardData?.getData('text/plain') ?? '';
             const date = parsePastedDate(text.trim(), this.format);
             if (date) {
                 writeInputDate(this.input, date);
@@ -540,10 +538,9 @@
     let observer = null;
     let bindings = [];
     function defaultOpts(options = {}) {
-        var _a, _b;
         return {
-            format: (_a = options.format) !== null && _a !== void 0 ? _a : 'dd/MM/yyyy',
-            locale: (_b = options.locale) !== null && _b !== void 0 ? _b : (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+            format: options.format ?? 'dd/MM/yyyy',
+            locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
         };
     }
     function initAll(selector, opts) {
@@ -635,7 +632,7 @@
         globalThis.GLOBAL_SDATE = new SuperDateRegistry();
     }
     var SuperDate = globalThis.GLOBAL_SDATE;
-    SuperDate.version = "0.0.1";
+    SuperDate.version = "1.3.0";
     SuperDate.name = "SuperDate";
 
     return SuperDate;

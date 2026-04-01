@@ -8,7 +8,7 @@
         "sourceMap": false,
         "module": "ESNext",
         "target": "ESNext",
-        "moduleResolution": "Node"
+        "moduleResolution": "bundler"
     },
     "include": [
         "src/ts/**/*.ts"

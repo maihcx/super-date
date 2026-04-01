@@ -28,17 +28,17 @@ npm run build
 ```
 
 Outputs:
-- `dist/SuperDate.cjs.js` — CommonJS (Node / webpack default)
-- `dist/SuperDate.esm.js` — ES Module (Vite / native ESM)
-- `dist/SuperDate.iife.js` — IIFE (plain `<script>` tag)
-- `dist/SuperDate.d.ts` — TypeScript declarations
+- `dist/super-date.esm.js` — ES Module (native ESM)
+- `dist/super-date.esm.min.js` — ES Module (native ESM with Minify)
+- `dist/super-date.umd.js` — ES UMD (native UMD)
+- `dist/super-date.min.js` — ES UMD (native UMD with Minify)
 
 ## Usage
 
 ### Via `<script>` tag (IIFE)
 
 ```html
-<script src="dist/SuperDate.iife.js"></script>
+<script src="dist/super-date.umd.js"></script>
 <script>
   SuperDate.bind('input[type="date"]');
 </script>
@@ -47,7 +47,7 @@ Outputs:
 ### ES Module
 
 ```js
-import SuperDate from './dist/SuperDate.esm.js';
+import SuperDate from './dist/super-date.esm.js';
 SuperDate.bind('.my-dates', { format: 'dd/MM/yyyy' });
 ```
 
