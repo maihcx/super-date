@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperDate — Documentation</title>
+  <link rel="stylesheet" href="../dist/super-date.min.css" />
+  <script src="../dist/super-date.umd.js"></script>
+  <style>
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --surface2:  #162032;
+      --border:    #2d3f55;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --dim:       #64748b;
+      --accent:    #38bdf8;
+      --accent2:   #0ea5e9;
+      --green:     #34d399;
+      --yellow:    #fbbf24;
+      --red:       #f87171;
+      --purple:    #a78bfa;
+      --radius:    10px;
+      --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    nav {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .nav-logo {
+      padding: 0 1.5rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .nav-logo span { color: var(--accent); }
+
+    .nav-group { padding: 0.5rem 0; }
+    .nav-group-label {
+      padding: 0.3rem 1.5rem;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+    }
+    nav a {
+      display: block;
+      padding: 0.35rem 1.5rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    nav a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(56,189,248,0.07); }
+
+    main {
+      flex: 1;
+      min-width: 0;
+      padding: 3rem clamp(1.25rem, 5vw, 4rem);
+    }
+
+    @media (max-width: 768px) {
+      nav { display: none; }
+      main { padding: 1.5rem 1rem; }
+    }
+
+    @media (min-width: 1280px) {
+      main {
+        padding-left: clamp(2rem, 4vw, 5rem);
+        padding-right: clamp(2rem, 4vw, 5rem);
+      }
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 2rem; font-weight: 800; color: var(--text); margin-bottom: 0.5rem; }
+    h1 span { color: var(--accent); }
+    h2 { font-size: 1.3rem; font-weight: 700; color: var(--text); margin: 2.5rem 0 1rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+    h3 { font-size: 1rem; font-weight: 700; color: var(--accent); margin: 1.5rem 0 0.6rem; }
+    p  { color: var(--muted); margin-bottom: 0.9rem; }
+    ul, ol { color: var(--muted); padding-left: 1.4rem; margin-bottom: 0.9rem; }
+    li { margin-bottom: 0.25rem; }
+    a  { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: var(--text); }
+
+    .subtitle {
+      color: var(--dim);
+      font-size: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Badge row ── */
+    .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .badge.blue   { color: var(--accent);  border-color: rgba(56,189,248,0.3);  background: rgba(56,189,248,0.08); }
+    .badge.green  { color: var(--green);   border-color: rgba(52,211,153,0.3);  background: rgba(52,211,153,0.08); }
+    .badge.purple { color: var(--purple);  border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.08); }
+
+    /* ── Code ── */
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--accent);
+    }
+
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem;
+      overflow-x: auto;
+      margin: 0.75rem 0 1.25rem;
+      position: relative;
+    }
+    pre code {
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+    }
+
+    /* very minimal syntax colouring via spans set by JS */
+    .tok-kw     { color: #c084fc; }
+    .tok-str    { color: #86efac; }
+    .tok-cmt    { color: #4e6580; font-style: italic; }
+    .tok-tag    { color: #f87171; }
+    .tok-attr   { color: #fbbf24; }
+    .tok-val    { color: #86efac; }
+    .tok-fn     { color: #38bdf8; }
+    .tok-num    { color: #fb923c; }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin: 0.75rem 0 1.25rem; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead { background: var(--surface); }
+    th { padding: 0.65rem 1rem; text-align: left; font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    td { padding: 0.6rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--muted); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); white-space: nowrap; }
+    tbody tr:hover td { background: rgba(255,255,255,0.025); }
+
+    /* ── Callout ── */
+    .callout {
+      display: flex; gap: 0.75rem;
+      padding: 0.9rem 1.1rem;
+      border-radius: var(--radius);
+      margin: 0.75rem 0 1.25rem;
+      font-size: 0.875rem;
+    }
+    .callout.info  { background: rgba(56,189,248,0.08);  border: 1px solid rgba(56,189,248,0.2);  color: #93c5fd; }
+    .callout.warn  { background: rgba(251,191,36,0.08);  border: 1px solid rgba(251,191,36,0.2);  color: #fde68a; }
+    .callout.tip   { background: rgba(52,211,153,0.08);  border: 1px solid rgba(52,211,153,0.2);  color: #6ee7b7; }
+    .callout-icon  { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Live demo area ── */
+    .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin: 0.75rem 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .demo-card .demo-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .demo-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+    }
+
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"] {
+      height: 36px;
+      width: 100%;
+      max-width: min(320px, 100%);
+      padding: 0 12px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    input[type="datetime-local"]:focus { border-color: var(--accent); }
+
+    .superdate-wrapper { display: block; max-width: 320px; }
+    .superdate-overlay {
+      --superdate-active-bg: var(--accent2);
+      --superdate-active-color: #fff;
+      --superdate-placeholder-color: #3d5368;
+      --superdate-sep-color: var(--dim);
+      color: var(--text);
+    }
+
+    /* ── Section anchors ── */
+    section { scroll-margin-top: 2rem; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar nav ── -->
+  <nav id="sidebar">
+    <div class="nav-logo">Super<span>Date</span> <span style="font-size:0.65rem;color:var(--dim);font-weight:400">docs</span></div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Getting started</div>
+      <a href="#overview">Overview</a>
+      <a href="#install">Install &amp; Build</a>
+      <a href="#usage">Usage</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">API</div>
+      <a href="#api-bind">bind()</a>
+      <a href="#api-init">init()</a>
+      <a href="#api-destroy">destroy()</a>
+      <a href="#options">Options</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Reference</div>
+      <a href="#tokens">Format tokens</a>
+      <a href="#data-attrs">Data attributes</a>
+      <a href="#css-vars">CSS variables</a>
+      <a href="#keyboard">Keyboard</a>
+      <a href="#input-value">Input value</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Live demos</div>
+      <a href="#demo-date">Date</a>
+      <a href="#demo-time">Time</a>
+      <a href="#demo-datetime">Datetime-local</a>
+    </div>
+  </nav>
+
+  <!-- ── Main content ── -->
+  <main>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <h1>Super<span>Date</span></h1>
+      <p class="subtitle">Lightweight TypeScript enhancer for native date, time, and datetime-local inputs.</p>
+      <div class="badges">
+        <span class="badge blue">✦ Zero dependencies</span>
+        <span class="badge green">✦ 3 input types</span>
+        <span class="badge purple">✦ Fully keyboard-accessible</span>
+      </div>
+      <p>SuperDate replaces the native browser date/time picker chrome with a fully custom, format-aware overlay — while still delegating the actual popup calendar or clock to the OS. You never re-implement a calendar widget.</p>
+      <p>The underlying <code>input.value</code> always stays in standard ISO format, so it drops in alongside any existing form logic without changes.</p>
+    </section>
+
+    <!-- INSTALL -->
+    <section id="install">
+      <h2>Install &amp; Build</h2>
+      <p>Copy the <code>dist/</code> folder into your project, or build from source:</p>
+<pre><code>npm install
+npm run build</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Format</th><th>Use when</th></tr></thead>
+          <tbody>
+            <tr><td>super-date.umd.js</td><td>UMD</td><td>Plain <code>&lt;script&gt;</code> tag, exposes global <code>SuperDate</code></td></tr>
+            <tr><td>super-date.min.js</td><td>UMD minified</td><td>Production <code>&lt;script&gt;</code> tag</td></tr>
+            <tr><td>super-date.esm.js</td><td>ES Module</td><td><code>import</code> in bundler or modern browser</td></tr>
+            <tr><td>super-date.esm.min.js</td><td>ESM minified</td><td>Production ESM</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- USAGE -->
+    <section id="usage">
+      <h2>Usage</h2>
+
+      <h3>Via &lt;script&gt; tag</h3>
+<pre><code><span class="tok-tag">&lt;link</span> <span class="tok-attr">rel</span>=<span class="tok-val">"stylesheet"</span> <span class="tok-attr">href</span>=<span class="tok-val">"dist/super-date.min.css"</span> <span class="tok-tag">/&gt;</span>
+<span class="tok-tag">&lt;script</span> <span class="tok-attr">src</span>=<span class="tok-val">"dist/super-date.umd.js"</span><span class="tok-tag">&gt;&lt;/script&gt;</span>
+<span class="tok-tag">&lt;script&gt;</span>
+  SuperDate.<span class="tok-fn">bind</span>(<span class="tok-str">'.sd'</span>, { format: <span class="tok-str">'dd/MM/yyyy'</span> });
+<span class="tok-tag">&lt;/script&gt;</span></code></pre>
+
+      <h3>ES Module</h3>
+<pre><code><span class="tok-kw">import</span> SuperDate <span class="tok-kw">from</span> <span class="tok-str">'./dist/super-date.esm.js'</span>;
+SuperDate.<span class="tok-fn">bind</span>(<span class="tok-str">'.sd'</span>, { format: <span class="tok-str">'dd/MM/yyyy'</span> });</code></pre>
+
+      <h3>TypeScript / bundler</h3>
+<pre><code><span class="tok-kw">import</span> SuperDate <span class="tok-kw">from</span> <span class="tok-str">'superdate'</span>;
+SuperDate.<span class="tok-fn">bind</span>(<span class="tok-str">'.sd'</span>);</code></pre>
+    </section>
+
+    <!-- API BIND -->
+    <section id="api-bind">
+      <h2>SuperDate.bind()</h2>
+      <p>Enhances all current <strong>and future</strong> matching inputs. Uses a <code>MutationObserver</code> to catch inputs added to the DOM after the call.</p>
+
+<pre><code>SuperDate.<span class="tok-fn">bind</span>(selector: <span class="tok-kw">string</span>, options?: SuperDateOptions): <span class="tok-kw">this</span></code></pre>
+
+      <p>Supports <code>input[type="date"]</code>, <code>input[type="time"]</code>, and <code>input[type="datetime-local"]</code> within the same selector. Returns <code>this</code> for chaining.</p>
+
+<pre><code><span class="tok-cmt">// all three types under one selector</span>
+SuperDate.<span class="tok-fn">bind</span>(<span class="tok-str">'.sd'</span>, {
+  format:            <span class="tok-str">'dd/MM/yyyy'</span>,
+  timeFormat:        <span class="tok-str">'HH:mm'</span>,
+  dateTimeDelimiter: <span class="tok-str">' '</span>,
+});
+
+<span class="tok-cmt">// chaining</span>
+SuperDate
+  .<span class="tok-fn">bind</span>(<span class="tok-str">'.date-field'</span>, { format: <span class="tok-str">'yyyy/MM/dd'</span> })
+  .<span class="tok-fn">bind</span>(<span class="tok-str">'.time-field'</span>, { timeFormat: <span class="tok-str">'HH:mm:ss'</span> });</code></pre>
+    </section>
+
+    <!-- API INIT -->
+    <section id="api-init">
+      <h2>SuperDate.init()</h2>
+      <p>Manually enhance a single element. Returns the <code>SuperDateInstance</code>. Safe to call on an already-enhanced element — returns the existing instance.</p>
+
+<pre><code>SuperDate.<span class="tok-fn">init</span>(el: HTMLInputElement, options?: SuperDateOptions): SuperDateInstance</code></pre>
+
+<pre><code><span class="tok-kw">const</span> el = document.<span class="tok-fn">querySelector</span>(<span class="tok-str">'#my-dt'</span>) <span class="tok-kw">as</span> HTMLInputElement;
+SuperDate.<span class="tok-fn">init</span>(el, {
+  format:            <span class="tok-str">'dd/MM/yyyy'</span>,
+  timeFormat:        <span class="tok-str">'HH:mm:ss'</span>,
+  dateTimeDelimiter: <span class="tok-str">' | '</span>,
+});</code></pre>
+    </section>
+
+    <!-- API DESTROY -->
+    <section id="api-destroy">
+      <h2>SuperDate.destroy()</h2>
+      <p>Removes the overlay, detaches all listeners, and restores the original native input. The element is marked so the <code>MutationObserver</code> won't re-bind it automatically. Call <code>bind()</code> or <code>init()</code> again to re-enable.</p>
+
+<pre><code>SuperDate.<span class="tok-fn">destroy</span>(el: HTMLInputElement): <span class="tok-kw">void</span></code></pre>
+    </section>
+
+    <!-- OPTIONS -->
+    <section id="options">
+      <h2>Options</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>format</td><td>string</td><td><code>'dd/MM/yyyy'</code></td><td>Display format for <code>date</code> inputs, and the date part of <code>datetime-local</code></td></tr>
+            <tr><td>timeFormat</td><td>string</td><td><code>'HH:mm'</code></td><td>Display format for <code>time</code> inputs, and the time part of <code>datetime-local</code></td></tr>
+            <tr><td>dateTimeDelimiter</td><td>string</td><td><code>' '</code></td><td>String inserted between date and time parts in <code>datetime-local</code> overlays</td></tr>
+            <tr><td>locale</td><td>string</td><td><code>navigator.language</code></td><td>Locale — reserved for future i18n features</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TOKENS -->
+    <section id="tokens">
+      <h2>Format tokens</h2>
+      <h3>Date tokens</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Token</th><th>Description</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>yyyy</td><td>4-digit year</td><td><code>2025</code></td></tr>
+            <tr><td>yy</td><td>2-digit year</td><td><code>25</code></td></tr>
+            <tr><td>MM</td><td>Month, zero-padded</td><td><code>03</code></td></tr>
+            <tr><td>M</td><td>Month, no padding</td><td><code>3</code></td></tr>
+            <tr><td>dd</td><td>Day, zero-padded</td><td><code>07</code></td></tr>
+            <tr><td>d</td><td>Day, no padding</td><td><code>7</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Time tokens</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Token</th><th>Description</th><th>Range</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>HH</td><td>Hours, 24h, zero-padded</td><td>00–23</td><td><code>09</code>, <code>23</code></td></tr>
+            <tr><td>H</td><td>Hours, 24h, no padding</td><td>0–23</td><td><code>9</code>, <code>23</code></td></tr>
+            <tr><td>hh</td><td>Hours, 12h, zero-padded</td><td>01–12</td><td><code>09</code>, <code>12</code></td></tr>
+            <tr><td>h</td><td>Hours, 12h, no padding</td><td>1–12</td><td><code>9</code>, <code>12</code></td></tr>
+            <tr><td>mm</td><td>Minutes, zero-padded</td><td>00–59</td><td><code>05</code></td></tr>
+            <tr><td>ss</td><td>Seconds, zero-padded</td><td>00–59</td><td><code>30</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div><strong>MM vs mm</strong> — <code>MM</code> (uppercase) = months, <code>mm</code> (lowercase) = minutes. The token regex is case-sensitive.</div>
+      </div>
+    </section>
+
+    <!-- DATA ATTRS -->
+    <section id="data-attrs">
+      <h2>Data attributes</h2>
+      <p>Per-element attributes always override the global <code>bind()</code> options.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Attribute</th><th>Applies to</th><th>Example value</th></tr></thead>
+          <tbody>
+            <tr><td>data-date-format</td><td><code>date</code>, <code>datetime-local</code></td><td><code>"yyyy/MM/dd"</code></td></tr>
+            <tr><td>data-time-format</td><td><code>time</code>, <code>datetime-local</code></td><td><code>"HH:mm:ss"</code></td></tr>
+            <tr><td>data-date-time-delimiter</td><td><code>datetime-local</code></td><td><code>" | "</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre><code><span class="tok-tag">&lt;input</span> <span class="tok-attr">type</span>=<span class="tok-val">"date"</span>           <span class="tok-attr">data-date-format</span>=<span class="tok-val">"yyyy/MM/dd"</span> <span class="tok-tag">/&gt;</span>
+<span class="tok-tag">&lt;input</span> <span class="tok-attr">type</span>=<span class="tok-val">"time"</span>           <span class="tok-attr">data-time-format</span>=<span class="tok-val">"HH:mm:ss"</span> <span class="tok-tag">/&gt;</span>
+<span class="tok-tag">&lt;input</span> <span class="tok-attr">type</span>=<span class="tok-val">"datetime-local"</span>
+       <span class="tok-attr">data-date-format</span>=<span class="tok-val">"dd/MM/yyyy"</span>
+       <span class="tok-attr">data-time-format</span>=<span class="tok-val">"HH:mm:ss"</span>
+       <span class="tok-attr">data-date-time-delimiter</span>=<span class="tok-val">" | "</span> <span class="tok-tag">/&gt;</span></code></pre>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div>A space <code>" "</code> as <code>data-date-time-delimiter</code> is the default and works correctly — the overlay renders it as <code>&amp;nbsp;</code> internally to prevent CSS whitespace collapsing.</div>
+      </div>
+    </section>
+
+    <!-- CSS VARS -->
+    <section id="css-vars">
+      <h2>CSS variables</h2>
+      <p>Scope overrides to <code>.superdate-overlay</code> on a wrapper or globally:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Default</th><th>Controls</th></tr></thead>
+          <tbody>
+            <tr><td>--superdate-active-bg</td><td><code>#2563eb</code></td><td>Active segment background</td></tr>
+            <tr><td>--superdate-active-color</td><td><code>#fff</code></td><td>Active segment text</td></tr>
+            <tr><td>--superdate-placeholder-color</td><td><code>#9ca3af</code></td><td>Empty segment placeholder text</td></tr>
+            <tr><td>--superdate-sep-color</td><td><code>inherit</code></td><td>Separator / literal character color</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre><code><span class="tok-cmt">/* Override globally */</span>
+.superdate-overlay {
+  --superdate-active-bg:         <span class="tok-num">#0ea5e9</span>;
+  --superdate-active-color:      <span class="tok-num">#fff</span>;
+  --superdate-placeholder-color: <span class="tok-num">#475569</span>;
+  --superdate-sep-color:         <span class="tok-num">#64748b</span>;
+}
+
+<span class="tok-cmt">/* Or scope to one wrapper */</span>
+#my-form .superdate-overlay {
+  --superdate-active-bg: <span class="tok-num">#7c3aed</span>;
+}</code></pre>
+    </section>
+
+    <!-- KEYBOARD -->
+    <section id="keyboard">
+      <h2>Keyboard shortcuts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>0–9</td><td>Type digit into active segment; auto-advances when segment is full</td></tr>
+            <tr><td>↑ / ↓</td><td>Increment / decrement the active segment value (wraps around)</td></tr>
+            <tr><td>← / →</td><td>Move to previous / next token segment</td></tr>
+            <tr><td>Tab / Shift+Tab</td><td>Move to next / previous segment; Tab out when at last/first</td></tr>
+            <tr><td>Backspace</td><td>Erase last digit in the typing buffer</td></tr>
+            <tr><td>Delete</td><td>Same as Backspace; on a selection — clears all selected tokens</td></tr>
+            <tr><td>Escape</td><td>Clear selection, or deactivate overlay</td></tr>
+            <tr><td>Ctrl+A</td><td>Select all segments</td></tr>
+            <tr><td>Ctrl+C</td><td>Copy selected segments as formatted string</td></tr>
+            <tr><td>Click &amp; drag</td><td>Multi-segment selection</td></tr>
+            <tr><td>Double-click</td><td>Select all segments</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- INPUT VALUE -->
+    <section id="input-value">
+      <h2>Input value</h2>
+      <p>SuperDate only changes the <strong>visual overlay</strong>. The underlying <code>input.value</code> always stays in standard ISO format:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Input type</th><th>input.value format</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>date</td><td><code>yyyy-MM-dd</code></td><td><code>2025-03-07</code></td></tr>
+            <tr><td>time</td><td><code>HH:mm:ss</code></td><td><code>09:30:00</code></td></tr>
+            <tr><td>datetime-local</td><td><code>yyyy-MM-ddTHH:mm:ss</code></td><td><code>2025-03-07T09:30:00</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">✦</span>
+        <div>Because <code>input.value</code> is unchanged, SuperDate is fully compatible with any existing form serialisation, validation library, or framework two-way binding.</div>
+      </div>
+    </section>
+
+    <!-- DEMO DATE -->
+    <section id="demo-date">
+      <h2>Live demo — date</h2>
+
+      <div class="demo-card">
+        <div class="demo-row">
+          <span class="demo-label">dd/MM/yyyy (default)</span>
+          <input type="date" class="sd-doc" id="demo-d1" />
+        </div>
+        <div class="demo-row">
+          <span class="demo-label">yyyy/MM/dd — data-date-format</span>
+          <input type="date" class="sd-doc" id="demo-d2" data-date-format="yyyy/MM/dd" />
+        </div>
+        <div class="demo-row">
+          <span class="demo-label">MM-dd-yyyy</span>
+          <input type="date" class="sd-doc" id="demo-d3" data-date-format="MM-dd-yyyy" />
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO TIME -->
+    <section id="demo-time">
+      <h2>Live demo — time</h2>
+
+      <div class="demo-card">
+        <div class="demo-row">
+          <span class="demo-label">HH:mm (default)</span>
+          <input type="time" class="sd-doc" id="demo-t1" />
+        </div>
+        <div class="demo-row">
+          <span class="demo-label">HH:mm:ss — data-time-format</span>
+          <input type="time" class="sd-doc" id="demo-t2" data-time-format="HH:mm:ss" />
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO DATETIME -->
+    <section id="demo-datetime">
+      <h2>Live demo — datetime-local</h2>
+
+      <div class="demo-card">
+        <div class="demo-row">
+          <span class="demo-label">dd/MM/yyyy HH:mm (space delimiter)</span>
+          <input type="datetime-local" class="sd-doc" id="demo-dt1" />
+        </div>
+        <div class="demo-row">
+          <span class="demo-label">yyyy-MM-dd | HH:mm:ss — custom delimiter</span>
+          <input type="datetime-local" class="sd-doc" id="demo-dt2"
+            data-date-format="yyyy-MM-dd"
+            data-time-format="HH:mm:ss"
+            data-date-time-delimiter=" | " />
+        </div>
+      </div>
+
+      <div class="demo-row" style="margin-top:0.25rem">
+        <button id="read-all" style="padding:7px 16px;background:var(--accent2);color:#fff;border:none;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;">Read all values</button>
+        <pre id="read-out" style="margin-top:0.75rem;display:none"></pre>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  window.addEventListener('load', () => {
+    SuperDate.bind('.sd-doc', {
+      format:            'dd/MM/yyyy',
+      timeFormat:        'HH:mm',
+      dateTimeDelimiter: ' ',
+    });
+  });
+
+  // Active nav link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px' });
+  sections.forEach(s => observer.observe(s));
+
+  // Read values button
+  document.getElementById('read-all').addEventListener('click', () => {
+    const ids = ['demo-d1','demo-d2','demo-d3','demo-t1','demo-t2','demo-dt1','demo-dt2'];
+    const out = ids.map(id => {
+      const el = document.getElementById(id);
+      return `#${id} (${el.type}): "${el.value || ''}"`;
+    }).join('\n');
+    const pre = document.getElementById('read-out');
+    pre.textContent = out;
+    pre.style.display = 'block';
+  });
+</script>
+</body>
+</html>

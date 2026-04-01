@@ -1,7 +1,7 @@
 {
   "name": "super-date",
   "version": "0.0.0",
-  "description": "An overlay for the date input element in HTML.",
+  "description": "Lightweight TypeScript enhancer for native date, time, and datetime-local inputs.",
   "author": "Huỳnh Công Xuân Mai",
   "license": "MIT",
   "sideEffects": false,
