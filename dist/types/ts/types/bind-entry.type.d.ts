@@ -1,6 +1,0 @@
-import { SuperDateOptions } from "./super-date.type";
-export interface BindEntry {
-    selector: string;
-    options: Required<SuperDateOptions>;
-}
-//# sourceMappingURL=bind-entry.type.d.ts.map

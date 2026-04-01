@@ -1,4 +1,4 @@
-/*! SuperDate v0.0.1 | MIT License */
+/*! SuperDate v1.3.0 | MIT License */
 /**
  * format.ts — format string parsing, token metadata, and date read/write helpers.
  */
@@ -88,7 +88,7 @@ function tokenMinValue(token) {
 // ─── Date construction ────────────────────────────────────────────────────────
 /** Clamp a year/month/day combination to a real calendar date. */
 function buildDate(current, token, newRaw) {
-    const base = current !== null && current !== void 0 ? current : new Date();
+    const base = current ?? new Date();
     let y = base.getFullYear();
     let m = base.getMonth() + 1; // 1-based
     let d = base.getDate();
@@ -292,45 +292,54 @@ function deactivateAll(segEls) {
  * instance.ts — SuperDateInstance manages one enhanced date input:
  * overlay rendering, keyboard/mouse/paste interaction, and lifecycle.
  */
-// Augment HTMLInputElement to carry our instance reference.
 const INSTANCE_KEY = '__superdate__';
 class SuperDateInstance {
     constructor(input, globalFormat) {
-        var _a;
         this.activeTokenIdx = -1;
         this.typingBuffer = '';
+        // ── Selection state ────────────────────────────────────────────────────────
+        // selAnchor = token-seg index where mousedown started (-1 = no drag)
+        // selEnd    = token-seg index currently under cursor during drag
+        // Selection mode: selAnchor !== -1  →  activeTokenIdx is always -1
+        this.selAnchor = -1;
+        this.selEnd = -1;
+        this._justDragged = false;
+        this._destroyed = false;
         this.input = input;
-        this.format = (_a = input.dataset.dateFormat) !== null && _a !== void 0 ? _a : globalFormat;
+        this.format = input.dataset.dateFormat ?? globalFormat;
         this.segments = parseFormat(this.format);
-        const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => { var _a, _b; return (_b = (_a = this.input).showPicker) === null || _b === void 0 ? void 0 : _b.call(_a); });
+        const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => this.input.showPicker?.());
         this.wrapper = elements.wrapper;
         this.overlay = elements.overlay;
         this.segEls = elements.segEls;
         this.render();
+        this._onKeyDown = (e) => this.handleKeyDown(e);
+        this._onPaste = (e) => this.handlePaste(e);
+        this._onChange = () => this.render();
+        this._onBlur = (e) => this.handleBlur(e);
+        this._onWrapClick = (e) => this.handleWrapperClick(e);
+        this._onWrapDblClick = (e) => this.handleWrapperDblClick(e);
+        this._onMouseDown = (e) => this.handleMouseDown(e);
+        this._onMouseMove = (e) => this.handleMouseMove(e);
+        this._onMouseUp = (e) => this.handleMouseUp(e);
+        this._mutObs = new MutationObserver(() => { if (!this._destroyed)
+            this.render(); });
         this.attachEvents();
     }
     // ── Rendering ───────────────────────────────────────────────────────────────
     render() {
         renderSegments(this.segments, this.segEls, readInputDate(this.input));
     }
-    // ── Segment activation ───────────────────────────────────────────────────────
-    activateSegment(idx) {
-        if (idx < 0 || idx >= this.segments.length)
-            return;
-        if (!this.segments[idx].token)
-            return;
-        this.typingBuffer = '';
-        this.activeTokenIdx = idx;
-        activateSegmentEl(this.segEls, idx);
-        this.input.focus({ preventScroll: true });
-    }
-    deactivate() {
-        this.activeTokenIdx = -1;
-        this.typingBuffer = '';
-        deactivateAll(this.segEls);
-    }
+    // ── Helpers ──────────────────────────────────────────────────────────────────
     firstTokenIdx() {
         return this.segments.findIndex(s => s.token !== null);
+    }
+    lastTokenIdx() {
+        for (let i = this.segments.length - 1; i >= 0; i--) {
+            if (this.segments[i].token)
+                return i;
+        }
+        return -1;
     }
     nextTokenIdx(from, dir = 1) {
         let i = from + dir;
@@ -341,8 +350,263 @@ class SuperDateInstance {
         }
         return -1;
     }
-    // ── Keyboard handling ────────────────────────────────────────────────────────
+    // ── Segment activation ───────────────────────────────────────────────────────
+    activateSegment(idx) {
+        if (idx < 0 || idx >= this.segments.length)
+            return;
+        if (!this.segments[idx].token)
+            return;
+        this.endSelection();
+        this.typingBuffer = '';
+        this.activeTokenIdx = idx;
+        activateSegmentEl(this.segEls, idx);
+        this.input.focus({ preventScroll: true });
+    }
+    deactivate() {
+        // Snap segment value up to minValue if it went below (e.g. 0 → 1 for day/month)
+        if (this.activeTokenIdx !== -1) {
+            const token = this.segments[this.activeTokenIdx].token;
+            if (token) {
+                if (this.getBufferValue(token) == '0') {
+                    const now = new Date();
+                    let nowValue;
+                    switch (token) {
+                        case 'dd':
+                        case 'd':
+                            nowValue = now.getDate();
+                            break;
+                        case 'MM':
+                        case 'M':
+                            nowValue = now.getMonth() + 1;
+                            break;
+                        case 'yyyy':
+                            nowValue = now.getFullYear();
+                            break;
+                        case 'yy':
+                            nowValue = now.getFullYear() % 100;
+                            break;
+                    }
+                    this.typingBuffer = '';
+                    this.typeDigit(token, nowValue.toString());
+                }
+                const date = readInputDate(this.input);
+                if (date) {
+                    let current;
+                    switch (token) {
+                        case 'dd':
+                        case 'd':
+                            current = date.getDate();
+                            break;
+                        case 'MM':
+                        case 'M':
+                            current = date.getMonth() + 1;
+                            break;
+                        case 'yyyy':
+                            current = date.getFullYear();
+                            break;
+                        case 'yy':
+                            current = date.getFullYear() % 100;
+                            break;
+                    }
+                    if (current < tokenMinValue(token)) {
+                        this.commitTokenValue(token, tokenMinValue(token));
+                    }
+                }
+            }
+        }
+        this.activeTokenIdx = -1;
+        this.typingBuffer = '';
+        this.endSelection();
+        deactivateAll(this.segEls);
+    }
+    // ── Selection via active class ────────────────────────────────────────────
+    // We reuse the existing `.active` style — every token seg in the range
+    // gets the active class exactly as if the user had clicked each one.
+    // This means no new CSS class is needed.
+    hasSelection() {
+        return this.selAnchor !== -1;
+    }
+    /** Paint active class on all token segs in [min(anchor,end), max(anchor,end)]. */
+    paintSelection(anchor, end) {
+        const from = Math.min(anchor, end);
+        const to = Math.max(anchor, end);
+        this.segEls.forEach((el, i) => {
+            el.classList.toggle('active', this.segments[i].token !== null && i >= from && i <= to);
+        });
+    }
+    /** Update selEnd and repaint. */
+    extendSelectionTo(idx) {
+        this.selEnd = idx;
+        this.paintSelection(this.selAnchor, this.selEnd);
+    }
+    /** Select every token segment (double-click / Ctrl+A). */
+    selectAll() {
+        const first = this.firstTokenIdx();
+        const last = this.lastTokenIdx();
+        if (first === -1)
+            return;
+        this.activeTokenIdx = -1;
+        this.selAnchor = first;
+        this.selEnd = last;
+        this.paintSelection(first, last);
+    }
+    /** Clear selection state and remove active class from all segs. */
+    endSelection() {
+        this.selAnchor = -1;
+        this.selEnd = -1;
+        deactivateAll(this.segEls);
+    }
+    // ── Copy / delete selected range ─────────────────────────────────────────
+    copySelection() {
+        const date = readInputDate(this.input);
+        if (!date || !this.hasSelection())
+            return;
+        const from = Math.min(this.selAnchor, this.selEnd);
+        const to = Math.max(this.selAnchor, this.selEnd);
+        let text = '';
+        for (let i = from; i <= to; i++) {
+            const seg = this.segments[i];
+            if (!seg)
+                continue;
+            text += seg.token ? tokenValue(seg.token, date) : seg.text;
+        }
+        navigator.clipboard.writeText(text).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        });
+    }
+    deleteSelection() {
+        if (!this.hasSelection())
+            return;
+        const from = Math.min(this.selAnchor, this.selEnd);
+        const to = Math.max(this.selAnchor, this.selEnd);
+        const allTokenCount = this.segments.filter(s => s.token).length;
+        let selTokenCount = 0;
+        for (let i = from; i <= to; i++) {
+            if (this.segments[i]?.token)
+                selTokenCount++;
+        }
+        if (selTokenCount === allTokenCount) {
+            this.input.value = '';
+            this.input.dispatchEvent(new Event('input', { bubbles: true }));
+            this.input.dispatchEvent(new Event('change', { bubbles: true }));
+            this.render();
+        }
+        this.endSelection();
+        this.activeTokenIdx = -1;
+    }
+    // ── Mouse drag ───────────────────────────────────────────────────────────
+    /** Return the nearest token-seg index from a mouse event, or -1. */
+    tokenIdxFromEvent(e) {
+        const el = e.target.closest('[data-idx]');
+        if (!el)
+            return -1;
+        const idx = parseInt(el.dataset.idx ?? '-1', 10);
+        return this.segments[idx]?.token ? idx : -1;
+    }
+    handleMouseDown(e) {
+        if (e.detail >= 2)
+            return; // dblclick handled separately
+        const idx = this.tokenIdxFromEvent(e);
+        if (idx === -1)
+            return;
+        this.selAnchor = idx;
+        this.selEnd = idx;
+    }
+    handleMouseMove(e) {
+        if (this.selAnchor === -1 || !(e.buttons & 1))
+            return;
+        const idx = this.tokenIdxFromEvent(e);
+        if (idx === -1)
+            return;
+        if (idx === this.selEnd)
+            return;
+        // First real move → enter selection mode, kill single-seg focus
+        if (this.activeTokenIdx !== -1) {
+            this.activeTokenIdx = -1;
+            this.typingBuffer = '';
+        }
+        this.extendSelectionTo(idx);
+    }
+    handleMouseUp(_e) {
+        if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
+            // Plain click (no drag) → activate that seg
+            const idx = this.selAnchor;
+            this.selAnchor = -1;
+            this.selEnd = -1;
+            this.activateSegment(idx);
+        }
+        else if (this.selAnchor !== this.selEnd) {
+            // Drag ended — set flag so the upcoming click event doesn't clear selection
+            this._justDragged = true;
+            this.input.focus({ preventScroll: true });
+        }
+    }
+    // ── Double-click: select all ─────────────────────────────────────────────
+    handleWrapperDblClick(e) {
+        e.preventDefault();
+        this.activeTokenIdx = -1;
+        this.typingBuffer = '';
+        this.selectAll();
+        this.input.focus({ preventScroll: true });
+    }
+    // ── Blur / wrapper click ─────────────────────────────────────────────────
+    handleBlur(e) {
+        const related = e.relatedTarget;
+        if (!related || !this.wrapper.contains(related)) {
+            this.deactivate();
+        }
+    }
+    handleWrapperClick(e) {
+        // Suppress the click that fires immediately after a drag ends
+        if (this._justDragged) {
+            this._justDragged = false;
+            return;
+        }
+        const target = e.target;
+        // Click on the blank wrapper background (not on a seg) → first seg
+        if (target === this.wrapper || target === this.input || target === this.overlay) {
+            this.endSelection();
+            this.activateSegment(this.firstTokenIdx());
+        }
+    }
+    // ── Keyboard ──────────────────────────────────────────────────────────────
     handleKeyDown(e) {
+        // Ctrl+A
+        if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            e.preventDefault();
+            this.selectAll();
+            return;
+        }
+        // Ctrl+C
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            if (this.hasSelection()) {
+                e.preventDefault();
+                this.copySelection();
+            }
+            return;
+        }
+        // Backspace / Delete on selection
+        if ((e.key === 'Backspace' || e.key === 'Delete') && this.hasSelection()) {
+            e.preventDefault();
+            this.deleteSelection();
+            return;
+        }
+        // Escape
+        if (e.key === 'Escape') {
+            if (this.hasSelection()) {
+                this.endSelection();
+            }
+            else {
+                this.deactivate();
+            }
+            return;
+        }
         if (this.activeTokenIdx === -1)
             return;
         const token = this.segments[this.activeTokenIdx].token;
@@ -380,17 +644,7 @@ class SuperDateInstance {
                 this.typingBuffer = this.typingBuffer.slice(0, -1);
                 this.renderBuffer();
                 break;
-            case 'Escape':
-                this.deactivate();
-                break;
             default:
-                if (e.ctrlKey || e.metaKey) {
-                    if (e.key === 'a') {
-                        e.preventDefault();
-                        this.activateSegment(this.firstTokenIdx());
-                    }
-                    break;
-                }
                 if (/^\d$/.test(e.key)) {
                     e.preventDefault();
                     this.typeDigit(token, e.key);
@@ -408,16 +662,16 @@ class SuperDateInstance {
             this.deactivate();
         }
     }
-    // ── Digit typing ─────────────────────────────────────────────────────────────
+    // ── Digit typing ──────────────────────────────────────────────────────────
     typeDigit(token, digit) {
         this.typingBuffer += digit;
         const num = parseInt(this.typingBuffer, 10);
         const maxVal = tokenMaxValue(token);
         const maxDigit = tokenMaxDigits(token);
-        const wouldExceed = num * 10 > maxVal;
         const fullLength = this.typingBuffer.length >= maxDigit;
-        if (fullLength || wouldExceed) {
-            const clamped = Math.max(tokenMinValue(token), Math.min(maxVal, num));
+        if (fullLength) {
+            const minVal = tokenMinValue(token);
+            const clamped = Math.max(minVal, Math.min(maxVal, num));
             this.commitTokenValue(token, clamped);
             this.typingBuffer = '';
             const next = this.nextTokenIdx(this.activeTokenIdx, 1);
@@ -443,10 +697,19 @@ class SuperDateInstance {
             el.classList.add('empty');
         }
     }
-    // ── Step (↑ ↓) ───────────────────────────────────────────────────────────────
+    getBufferValue(token) {
+        if (this.typingBuffer) {
+            return this.typingBuffer;
+        }
+        const date = readInputDate(this.input);
+        if (!date)
+            return '';
+        return tokenValue(token, date);
+    }
+    // ── Step (↑ ↓) ────────────────────────────────────────────────────────────
     stepValue(token, delta) {
         const date = readInputDate(this.input);
-        const base = date !== null && date !== void 0 ? date : new Date();
+        const base = date ?? new Date();
         let current;
         switch (token) {
             case 'dd':
@@ -478,47 +741,50 @@ class SuperDateInstance {
         writeInputDate(this.input, date);
         this.render();
     }
-    // ── Paste ────────────────────────────────────────────────────────────────────
+    // ── Paste ─────────────────────────────────────────────────────────────────
     handlePaste(e) {
-        var _a, _b;
         e.preventDefault();
-        const text = (_b = (_a = e.clipboardData) === null || _a === void 0 ? void 0 : _a.getData('text/plain')) !== null && _b !== void 0 ? _b : '';
+        const text = e.clipboardData?.getData('text/plain') ?? '';
         const date = parsePastedDate(text.trim(), this.format);
         if (date) {
             writeInputDate(this.input, date);
             this.render();
         }
     }
-    // ── Event wiring ─────────────────────────────────────────────────────────────
+    // ── Event wiring ──────────────────────────────────────────────────────────
     attachEvents() {
-        this.input.addEventListener('keydown', (e) => this.handleKeyDown(e));
-        this.input.addEventListener('paste', (e) => this.handlePaste(e));
-        this.input.addEventListener('change', () => this.render());
-        this.input.addEventListener('blur', (e) => {
-            const related = e.relatedTarget;
-            if (!related || !this.wrapper.contains(related))
-                this.deactivate();
-        });
-        // Click on wrapper background → activate first segment
-        this.wrapper.addEventListener('click', (e) => {
-            const target = e.target;
-            if (target === this.wrapper || target === this.input) {
-                this.activateSegment(this.firstTokenIdx());
-            }
-        });
-        // Re-render if `value` attribute is changed externally
-        new MutationObserver(() => this.render()).observe(this.input, {
+        this.input.addEventListener('keydown', this._onKeyDown);
+        this.input.addEventListener('paste', this._onPaste);
+        this.input.addEventListener('change', this._onChange);
+        this.input.addEventListener('blur', this._onBlur);
+        this.wrapper.addEventListener('click', this._onWrapClick);
+        this.wrapper.addEventListener('dblclick', this._onWrapDblClick);
+        this.overlay.addEventListener('mousedown', this._onMouseDown);
+        this.overlay.addEventListener('mousemove', this._onMouseMove);
+        this.overlay.addEventListener('mouseup', this._onMouseUp);
+        this._mutObs.observe(this.input, {
             attributes: true,
             attributeFilter: ['value', 'min', 'max'],
         });
     }
-    // ── Public API ────────────────────────────────────────────────────────────────
-    /** Re-render the overlay from the current input value. */
+    // ── Public API ────────────────────────────────────────────────────────────
     update() {
         this.render();
     }
-    /** Destroy this instance and restore the original input element. */
     destroy() {
+        if (this._destroyed)
+            return;
+        this._destroyed = true;
+        this._mutObs.disconnect();
+        this.input.removeEventListener('keydown', this._onKeyDown);
+        this.input.removeEventListener('paste', this._onPaste);
+        this.input.removeEventListener('change', this._onChange);
+        this.input.removeEventListener('blur', this._onBlur);
+        this.wrapper.removeEventListener('click', this._onWrapClick);
+        this.wrapper.removeEventListener('dblclick', this._onWrapDblClick);
+        this.overlay.removeEventListener('mousedown', this._onMouseDown);
+        this.overlay.removeEventListener('mousemove', this._onMouseMove);
+        this.overlay.removeEventListener('mouseup', this._onMouseUp);
         this.input.classList.remove('superdate-input');
         this.input.style.display = '';
         this.input.style.width = '';
@@ -530,34 +796,50 @@ class SuperDateInstance {
 /**
  * registry.ts — SuperDateRegistry tracks bound selectors and uses a single
  * MutationObserver to auto-initialise matching inputs added to the DOM later.
+ *
+ * Lifecycle:
+ * - destroy(el)  marks the element with [data-superdate-destroyed] so the
+ *   MutationObserver won't re-bind it automatically.
+ * - bind(selector) / init(el) remove that marker first, so calling bind or
+ *   init again on previously-destroyed elements works as expected.
  */
 let observer = null;
 let bindings = [];
+const DESTROYED_ATTR = 'data-superdate-destroyed';
+function isDestroyed(el) {
+    return el.hasAttribute(DESTROYED_ATTR);
+}
+function markDestroyed(el) {
+    el.setAttribute(DESTROYED_ATTR, '');
+}
+/** Remove the destroyed marker from all elements matching a selector. */
+function clearDestroyedBySelector(selector) {
+    document.querySelectorAll(selector).forEach(el => {
+        el.removeAttribute(DESTROYED_ATTR);
+    });
+}
 function defaultOpts(options = {}) {
-    var _a, _b;
     return {
-        format: (_a = options.format) !== null && _a !== void 0 ? _a : 'dd/MM/yyyy',
-        locale: (_b = options.locale) !== null && _b !== void 0 ? _b : (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+        format: options.format ?? 'dd/MM/yyyy',
+        locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
     };
 }
 function initAll(selector, opts) {
     document.querySelectorAll(selector).forEach(el => {
-        if (el.type !== 'date' || el[INSTANCE_KEY])
+        if (el.type !== 'date' || el[INSTANCE_KEY] || isDestroyed(el))
             return;
         el[INSTANCE_KEY] = new SuperDateInstance(el, opts.format);
     });
 }
 function tryInit(node) {
     for (const binding of bindings) {
-        // The node itself may match
         if (node instanceof HTMLInputElement && node.matches(binding.selector)) {
-            if (node.type === 'date' && !node[INSTANCE_KEY]) {
+            if (node.type === 'date' && !node[INSTANCE_KEY] && !isDestroyed(node)) {
                 node[INSTANCE_KEY] = new SuperDateInstance(node, binding.options.format);
             }
         }
-        // Or it may contain matching descendants
         node.querySelectorAll(binding.selector).forEach(el => {
-            if (el.type !== 'date' || el[INSTANCE_KEY])
+            if (el.type !== 'date' || el[INSTANCE_KEY] || isDestroyed(el))
                 return;
             el[INSTANCE_KEY] = new SuperDateInstance(el, binding.options.format);
         });
@@ -583,10 +865,16 @@ class SuperDateRegistry {
      * Bind SuperDate to all current **and future** `<input type="date">`
      * elements matching `selector`. Safe to call multiple times with
      * different selectors.
+     *
+     * Clears the destroyed marker from all matching elements so that
+     * previously-destroyed inputs in this selector group can be re-bound.
      */
     bind(selector, options = {}) {
         const opts = defaultOpts(options);
         bindings.push({ selector, options: opts });
+        // Remove destroyed flag for every element matching this selector
+        // so bind() acts as an intentional re-enable for that group.
+        clearDestroyedBySelector(selector);
         initAll(selector, opts);
         if (!observer)
             startObserver();
@@ -595,21 +883,30 @@ class SuperDateRegistry {
     /**
      * Manually enhance a single element.
      * Returns the existing instance if one is already attached.
+     *
+     * Clears the destroyed marker so an explicitly destroyed element can
+     * be re-initialised by calling init() again.
      */
     init(el, options = {}) {
         if (el[INSTANCE_KEY])
             return el[INSTANCE_KEY];
+        // Clear destroyed flag — caller explicitly wants this element enhanced.
+        el.removeAttribute(DESTROYED_ATTR);
         const opts = defaultOpts(options);
         const instance = new SuperDateInstance(el, opts.format);
         el[INSTANCE_KEY] = instance;
         return instance;
     }
-    /** Remove the enhancement from a single element. */
+    /**
+     * Remove the enhancement from a single element and mark it with
+     * [data-superdate-destroyed] so the MutationObserver won't re-bind it.
+     */
     destroy(el) {
         if (el[INSTANCE_KEY]) {
             el[INSTANCE_KEY].destroy();
             delete el[INSTANCE_KEY];
         }
+        markDestroyed(el);
     }
 }
 
@@ -626,7 +923,7 @@ class SuperDateRegistry {
  */
 /** Singleton registry — the default export used in most projects. */
 const SuperDate = new SuperDateRegistry();
-SuperDate.version = "0.0.1";
+SuperDate.version = "1.3.0";
 SuperDate.name = "SuperDate";
 
 export { SuperDate as default };
