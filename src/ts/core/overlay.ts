@@ -100,12 +100,7 @@ export function renderSegments(
   segments.forEach((seg, i) => {
     const el = segEls[i];
     if (!seg.token) {
-      // Use innerHTML with &nbsp; for whitespace-only literals so CSS doesn't collapse them
-      if (seg.text.trim() === '') {
-        el.innerHTML = seg.text.replace(/ /g, '&nbsp;');
-      } else {
-        el.textContent = seg.text;
-      }
+      el.textContent = seg.text;
       return;
     }
     const val = tokenValue(seg.token, date);

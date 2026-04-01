@@ -43,6 +43,7 @@ input.superdate-input {
   display: inline-block;
   border-radius: 2px;
   transition: background 0.1s;
+  white-space: pre;
 }
 
 .superdate-seg[data-token] {
