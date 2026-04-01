@@ -32,6 +32,9 @@ input.superdate-input {
   overflow: hidden;
   box-sizing: border-box;
   gap: 0;
+  /* prevent browser text selection interfering with drag */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .superdate-seg {
@@ -48,6 +51,7 @@ input.superdate-input {
   text-align: center;
 }
 
+/* Single-seg focus OR multi-seg drag selection — same colour, same class */
 .superdate-seg[data-token].active {
   background: var(--superdate-active-bg, #2563eb);
   color: var(--superdate-active-color, #fff);
@@ -76,4 +80,5 @@ input.superdate-input {
   flex-shrink: 0;
 }
 .superdate-icon:hover { opacity: 1; }
+
 /*# sourceMappingURL=super-date.css.map */

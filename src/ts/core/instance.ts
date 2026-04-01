@@ -10,6 +10,7 @@ import {
   tokenMaxDigits,
   tokenMaxValue,
   tokenMinValue,
+  tokenValue,
   buildDate,
   readInputDate,
   writeInputDate,
@@ -22,7 +23,6 @@ import {
   deactivateAll,
 } from './overlay';
 
-// Augment HTMLInputElement to carry our instance reference.
 export const INSTANCE_KEY = '__superdate__';
 
 declare global {
@@ -43,13 +43,32 @@ export class SuperDateInstance {
   private activeTokenIdx: number = -1;
   private typingBuffer: string = '';
 
+  // ── Selection state ────────────────────────────────────────────────────────
+  // selAnchor = token-seg index where mousedown started (-1 = no drag)
+  // selEnd    = token-seg index currently under cursor during drag
+  // Selection mode: selAnchor !== -1  →  activeTokenIdx is always -1
+  private selAnchor: number = -1;
+  private selEnd:    number = -1;
+  private _justDragged = false;
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  private _onKeyDown:     (e: Event) => void;
+  private _onPaste:       (e: Event) => void;
+  private _onChange:      () => void;
+  private _onBlur:        (e: Event) => void;
+  private _onWrapClick:   (e: Event) => void;
+  private _onWrapDblClick:(e: Event) => void;
+  private _onMouseDown:   (e: Event) => void;
+  private _onMouseMove:   (e: Event) => void;
+  private _onMouseUp:     (e: Event) => void;
+  private _mutObs:        MutationObserver;
+  private _destroyed = false;
+
   constructor(input: HTMLInputElement, globalFormat: string) {
     this.input = input;
     this.format = input.dataset.dateFormat ?? globalFormat;
-    
     this.segments = parseFormat(this.format);
-    
-    
+
     const elements = buildOverlay(
       input,
       this.segments,
@@ -62,6 +81,18 @@ export class SuperDateInstance {
     this.segEls  = elements.segEls;
 
     this.render();
+
+    this._onKeyDown      = (e) => this.handleKeyDown(e as KeyboardEvent);
+    this._onPaste        = (e) => this.handlePaste(e as ClipboardEvent);
+    this._onChange       = () => this.render();
+    this._onBlur         = (e) => this.handleBlur(e as FocusEvent);
+    this._onWrapClick    = (e) => this.handleWrapperClick(e as MouseEvent);
+    this._onWrapDblClick = (e) => this.handleWrapperDblClick(e as MouseEvent);
+    this._onMouseDown    = (e) => this.handleMouseDown(e as MouseEvent);
+    this._onMouseMove    = (e) => this.handleMouseMove(e as MouseEvent);
+    this._onMouseUp      = (e) => this.handleMouseUp(e as MouseEvent);
+    this._mutObs = new MutationObserver(() => { if (!this._destroyed) this.render(); });
+
     this.attachEvents();
   }
 
@@ -71,26 +102,17 @@ export class SuperDateInstance {
     renderSegments(this.segments, this.segEls, readInputDate(this.input));
   }
 
-  // ── Segment activation ───────────────────────────────────────────────────────
-
-  private activateSegment(idx: number): void {
-    if (idx < 0 || idx >= this.segments.length) return;
-    if (!this.segments[idx].token) return;
-
-    this.typingBuffer = '';
-    this.activeTokenIdx = idx;
-    activateSegmentEl(this.segEls, idx);
-    this.input.focus({ preventScroll: true });
-  }
-
-  private deactivate(): void {
-    this.activeTokenIdx = -1;
-    this.typingBuffer = '';
-    deactivateAll(this.segEls);
-  }
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   private firstTokenIdx(): number {
     return this.segments.findIndex(s => s.token !== null);
+  }
+
+  private lastTokenIdx(): number {
+    for (let i = this.segments.length - 1; i >= 0; i--) {
+      if (this.segments[i].token) return i;
+    }
+    return -1;
   }
 
   private nextTokenIdx(from: number, dir: 1 | -1 = 1): number {
@@ -102,9 +124,264 @@ export class SuperDateInstance {
     return -1;
   }
 
-  // ── Keyboard handling ────────────────────────────────────────────────────────
+  // ── Segment activation ───────────────────────────────────────────────────────
+
+  private activateSegment(idx: number): void {
+    if (idx < 0 || idx >= this.segments.length) return;
+    if (!this.segments[idx].token) return;
+
+    this.endSelection();
+    this.typingBuffer = '';
+    this.activeTokenIdx = idx;
+    activateSegmentEl(this.segEls, idx);
+    this.input.focus({ preventScroll: true });
+  }
+
+  private deactivate(): void {
+    // Snap segment value up to minValue if it went below (e.g. 0 → 1 for day/month)
+    if (this.activeTokenIdx !== -1) {
+      const token = this.segments[this.activeTokenIdx].token;
+      if (token) {
+        if (this.getBufferValue(token) == '0') {
+          const now = new Date();
+          let nowValue: number;
+          switch (token) {
+            case 'dd': case 'd':   nowValue = now.getDate();           break;
+            case 'MM': case 'M':   nowValue = now.getMonth() + 1;      break;
+            case 'yyyy':           nowValue = now.getFullYear();        break;
+            case 'yy':             nowValue = now.getFullYear() % 100; break;
+          }
+          this.typingBuffer = '';
+          this.typeDigit(token, nowValue.toString());
+        }
+        
+        const date = readInputDate(this.input);
+        if (date) {
+          let current: number;
+          switch (token) {
+            case 'dd': case 'd':   current = date.getDate();           break;
+            case 'MM': case 'M':   current = date.getMonth() + 1;      break;
+            case 'yyyy':           current = date.getFullYear();        break;
+            case 'yy':             current = date.getFullYear() % 100; break;
+          }
+          if (current! < tokenMinValue(token)) {
+            this.commitTokenValue(token, tokenMinValue(token));
+          }
+        }
+      }
+    }
+
+    this.activeTokenIdx = -1;
+    this.typingBuffer = '';
+    this.endSelection();
+    deactivateAll(this.segEls);
+  }
+
+  // ── Selection via active class ────────────────────────────────────────────
+  // We reuse the existing `.active` style — every token seg in the range
+  // gets the active class exactly as if the user had clicked each one.
+  // This means no new CSS class is needed.
+
+  private hasSelection(): boolean {
+    return this.selAnchor !== -1;
+  }
+
+  /** Paint active class on all token segs in [min(anchor,end), max(anchor,end)]. */
+  private paintSelection(anchor: number, end: number): void {
+    const from = Math.min(anchor, end);
+    const to   = Math.max(anchor, end);
+    this.segEls.forEach((el, i) => {
+      el.classList.toggle('active', this.segments[i].token !== null && i >= from && i <= to);
+    });
+  }
+
+  /** Update selEnd and repaint. */
+  private extendSelectionTo(idx: number): void {
+    this.selEnd = idx;
+    this.paintSelection(this.selAnchor, this.selEnd);
+  }
+
+  /** Select every token segment (double-click / Ctrl+A). */
+  private selectAll(): void {
+    const first = this.firstTokenIdx();
+    const last  = this.lastTokenIdx();
+    if (first === -1) return;
+    this.activeTokenIdx = -1;
+    this.selAnchor = first;
+    this.selEnd    = last;
+    this.paintSelection(first, last);
+  }
+
+  /** Clear selection state and remove active class from all segs. */
+  private endSelection(): void {
+    this.selAnchor = -1;
+    this.selEnd    = -1;
+    deactivateAll(this.segEls);
+  }
+
+  // ── Copy / delete selected range ─────────────────────────────────────────
+
+  private copySelection(): void {
+    const date = readInputDate(this.input);
+    if (!date || !this.hasSelection()) return;
+
+    const from = Math.min(this.selAnchor, this.selEnd);
+    const to   = Math.max(this.selAnchor, this.selEnd);
+    let text = '';
+    for (let i = from; i <= to; i++) {
+      const seg = this.segments[i];
+      if (!seg) continue;
+      text += seg.token ? tokenValue(seg.token, date) : seg.text;
+    }
+
+    navigator.clipboard.writeText(text).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+  }
+
+  private deleteSelection(): void {
+    if (!this.hasSelection()) return;
+
+    const from = Math.min(this.selAnchor, this.selEnd);
+    const to   = Math.max(this.selAnchor, this.selEnd);
+    const allTokenCount  = this.segments.filter(s => s.token).length;
+    let   selTokenCount  = 0;
+    for (let i = from; i <= to; i++) {
+      if (this.segments[i]?.token) selTokenCount++;
+    }
+
+    if (selTokenCount === allTokenCount) {
+      this.input.value = '';
+      this.input.dispatchEvent(new Event('input',  { bubbles: true }));
+      this.input.dispatchEvent(new Event('change', { bubbles: true }));
+      this.render();
+    }
+
+    this.endSelection();
+    this.activeTokenIdx = -1;
+  }
+
+  // ── Mouse drag ───────────────────────────────────────────────────────────
+
+  /** Return the nearest token-seg index from a mouse event, or -1. */
+  private tokenIdxFromEvent(e: MouseEvent): number {
+    const el = (e.target as HTMLElement).closest('[data-idx]') as HTMLElement | null;
+    if (!el) return -1;
+    const idx = parseInt(el.dataset.idx ?? '-1', 10);
+    return this.segments[idx]?.token ? idx : -1;
+  }
+
+  private handleMouseDown(e: MouseEvent): void {
+    if (e.detail >= 2) return; // dblclick handled separately
+    const idx = this.tokenIdxFromEvent(e);
+    if (idx === -1) return;
+    this.selAnchor = idx;
+    this.selEnd    = idx;
+  }
+
+  private handleMouseMove(e: MouseEvent): void {
+    if (this.selAnchor === -1 || !(e.buttons & 1)) return;
+    const idx = this.tokenIdxFromEvent(e);
+    if (idx === -1) return;
+    if (idx === this.selEnd) return;
+
+    // First real move → enter selection mode, kill single-seg focus
+    if (this.activeTokenIdx !== -1) {
+      this.activeTokenIdx = -1;
+      this.typingBuffer = '';
+    }
+    this.extendSelectionTo(idx);
+  }
+
+  private handleMouseUp(_e: MouseEvent): void {
+    if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
+      // Plain click (no drag) → activate that seg
+      const idx = this.selAnchor;
+      this.selAnchor = -1;
+      this.selEnd    = -1;
+      this.activateSegment(idx);
+    } else if (this.selAnchor !== this.selEnd) {
+      // Drag ended — set flag so the upcoming click event doesn't clear selection
+      this._justDragged = true;
+      this.input.focus({ preventScroll: true });
+    }
+  }
+
+  // ── Double-click: select all ─────────────────────────────────────────────
+
+  private handleWrapperDblClick(e: MouseEvent): void {
+    e.preventDefault();
+    this.activeTokenIdx = -1;
+    this.typingBuffer = '';
+    this.selectAll();
+    this.input.focus({ preventScroll: true });
+  }
+
+  // ── Blur / wrapper click ─────────────────────────────────────────────────
+
+  private handleBlur(e: FocusEvent): void {
+    const related = e.relatedTarget as Node | null;
+    if (!related || !this.wrapper.contains(related)) {
+      this.deactivate();
+    }
+  }
+
+  private handleWrapperClick(e: MouseEvent): void {
+    // Suppress the click that fires immediately after a drag ends
+    if (this._justDragged) {
+      this._justDragged = false;
+      return;
+    }
+    const target = e.target as HTMLElement;
+    // Click on the blank wrapper background (not on a seg) → first seg
+    if (target === this.wrapper || target === this.input || target === this.overlay) {
+      this.endSelection();
+      this.activateSegment(this.firstTokenIdx());
+    }
+  }
+
+  // ── Keyboard ──────────────────────────────────────────────────────────────
 
   private handleKeyDown(e: KeyboardEvent): void {
+    // Ctrl+A
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      this.selectAll();
+      return;
+    }
+
+    // Ctrl+C
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      if (this.hasSelection()) {
+        e.preventDefault();
+        this.copySelection();
+      }
+      return;
+    }
+
+    // Backspace / Delete on selection
+    if ((e.key === 'Backspace' || e.key === 'Delete') && this.hasSelection()) {
+      e.preventDefault();
+      this.deleteSelection();
+      return;
+    }
+
+    // Escape
+    if (e.key === 'Escape') {
+      if (this.hasSelection()) {
+        this.endSelection();
+      } else {
+        this.deactivate();
+      }
+      return;
+    }
+
     if (this.activeTokenIdx === -1) return;
 
     const token = this.segments[this.activeTokenIdx].token!;
@@ -135,14 +412,7 @@ export class SuperDateInstance {
         this.typingBuffer = this.typingBuffer.slice(0, -1);
         this.renderBuffer();
         break;
-      case 'Escape':
-        this.deactivate();
-        break;
       default:
-        if (e.ctrlKey || e.metaKey) {
-          if (e.key === 'a') { e.preventDefault(); this.activateSegment(this.firstTokenIdx()); }
-          break;
-        }
         if (/^\d$/.test(e.key)) {
           e.preventDefault();
           this.typeDigit(token, e.key);
@@ -161,7 +431,7 @@ export class SuperDateInstance {
     }
   }
 
-  // ── Digit typing ─────────────────────────────────────────────────────────────
+  // ── Digit typing ──────────────────────────────────────────────────────────
 
   private typeDigit(token: DateToken, digit: string): void {
     this.typingBuffer += digit;
@@ -169,11 +439,11 @@ export class SuperDateInstance {
     const maxVal   = tokenMaxValue(token);
     const maxDigit = tokenMaxDigits(token);
 
-    const wouldExceed = num * 10 > maxVal;
     const fullLength  = this.typingBuffer.length >= maxDigit;
 
-    if (fullLength || wouldExceed) {
-      const clamped = Math.max(tokenMinValue(token), Math.min(maxVal, num));
+    if (fullLength) {
+      const minVal  = tokenMinValue(token);
+      const clamped = Math.max(minVal, Math.min(maxVal, num));
       this.commitTokenValue(token, clamped);
       this.typingBuffer = '';
       const next = this.nextTokenIdx(this.activeTokenIdx, 1);
@@ -198,7 +468,18 @@ export class SuperDateInstance {
     }
   }
 
-  // ── Step (↑ ↓) ───────────────────────────────────────────────────────────────
+  private getBufferValue(token: DateToken): string {
+    if (this.typingBuffer) {
+      return this.typingBuffer;
+    }
+
+    const date = readInputDate(this.input);
+    if (!date) return '';
+
+    return tokenValue(token, date);
+  }
+
+  // ── Step (↑ ↓) ────────────────────────────────────────────────────────────
 
   private stepValue(token: DateToken, delta: number): void {
     const date = readInputDate(this.input);
@@ -206,15 +487,15 @@ export class SuperDateInstance {
     let current: number;
 
     switch (token) {
-      case 'dd': case 'd':   current = base.getDate();              break;
-      case 'MM': case 'M':   current = base.getMonth() + 1;         break;
-      case 'yyyy':           current = base.getFullYear();           break;
-      case 'yy':             current = base.getFullYear() % 100;    break;
+      case 'dd': case 'd':   current = base.getDate();           break;
+      case 'MM': case 'M':   current = base.getMonth() + 1;      break;
+      case 'yyyy':           current = base.getFullYear();        break;
+      case 'yy':             current = base.getFullYear() % 100; break;
     }
 
     const minV = tokenMinValue(token);
     const maxV = tokenMaxValue(token);
-    let next   = current + delta;
+    let next   = current! + delta;
 
     if (next < minV) next = maxV;
     if (next > maxV) next = minV;
@@ -228,7 +509,7 @@ export class SuperDateInstance {
     this.render();
   }
 
-  // ── Paste ────────────────────────────────────────────────────────────────────
+  // ── Paste ─────────────────────────────────────────────────────────────────
 
   private handlePaste(e: ClipboardEvent): void {
     e.preventDefault();
@@ -240,46 +521,53 @@ export class SuperDateInstance {
     }
   }
 
-  // ── Event wiring ─────────────────────────────────────────────────────────────
+  // ── Event wiring ──────────────────────────────────────────────────────────
 
   private attachEvents(): void {
-    this.input.addEventListener('keydown', (e) => this.handleKeyDown(e));
-    this.input.addEventListener('paste',   (e) => this.handlePaste(e));
-    this.input.addEventListener('change',  ()  => this.render());
+    this.input.addEventListener('keydown', this._onKeyDown);
+    this.input.addEventListener('paste',   this._onPaste);
+    this.input.addEventListener('change',  this._onChange);
+    this.input.addEventListener('blur',    this._onBlur);
 
-    this.input.addEventListener('blur', (e) => {
-      const related = (e as FocusEvent).relatedTarget as Node | null;
-      if (!related || !this.wrapper.contains(related)) this.deactivate();
-    });
+    this.wrapper.addEventListener('click',    this._onWrapClick);
+    this.wrapper.addEventListener('dblclick', this._onWrapDblClick);
+    this.overlay.addEventListener('mousedown', this._onMouseDown);
+    this.overlay.addEventListener('mousemove', this._onMouseMove);
+    this.overlay.addEventListener('mouseup',   this._onMouseUp);
 
-    // Click on wrapper background → activate first segment
-    this.wrapper.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target === this.wrapper || target === this.input) {
-        this.activateSegment(this.firstTokenIdx());
-      }
-    });
-
-    // Re-render if `value` attribute is changed externally
-    new MutationObserver(() => this.render()).observe(this.input, {
+    this._mutObs.observe(this.input, {
       attributes: true,
       attributeFilter: ['value', 'min', 'max'],
     });
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
 
-  /** Re-render the overlay from the current input value. */
   public update(): void {
     this.render();
   }
 
-  /** Destroy this instance and restore the original input element. */
   public destroy(): void {
+    if (this._destroyed) return;
+    this._destroyed = true;
+
+    this._mutObs.disconnect();
+
+    this.input.removeEventListener('keydown', this._onKeyDown);
+    this.input.removeEventListener('paste',   this._onPaste);
+    this.input.removeEventListener('change',  this._onChange);
+    this.input.removeEventListener('blur',    this._onBlur);
+
+    this.wrapper.removeEventListener('click',    this._onWrapClick);
+    this.wrapper.removeEventListener('dblclick', this._onWrapDblClick);
+    this.overlay.removeEventListener('mousedown', this._onMouseDown);
+    this.overlay.removeEventListener('mousemove', this._onMouseMove);
+    this.overlay.removeEventListener('mouseup',   this._onMouseUp);
+
     this.input.classList.remove('superdate-input');
-    this.input.style.display  = '';
-    this.input.style.width    = '';
-    this.input.style.color    = '';
+    this.input.style.display = '';
+    this.input.style.width   = '';
+    this.input.style.color   = '';
     this.wrapper.replaceWith(this.input);
   }
 }
