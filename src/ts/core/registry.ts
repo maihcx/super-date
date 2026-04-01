@@ -30,10 +30,10 @@ function clearDestroyedBySelector(selector: string): void {
 
 function defaultOpts(options: SuperDateOptions = {}): Required<SuperDateOptions> {
   return {
-    format:            options.format            ?? 'dd/MM/yyyy',
-    timeFormat:        options.timeFormat         ?? 'HH:mm',
-    dateTimeDelimiter: options.dateTimeDelimiter  ?? ' ',
-    locale:            options.locale             ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+    format: options.format ?? 'dd/MM/yyyy',
+    timeFormat: options.timeFormat ?? 'HH:mm',
+    dateTimeDelimiter: options.dateTimeDelimiter ?? ' ',
+    locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
   };
 }
 
@@ -116,7 +116,7 @@ export class SuperDateRegistry {
 
     el.removeAttribute(DESTROYED_ATTR);
 
-    const opts     = defaultOpts(options);
+    const opts = defaultOpts(options);
     const instance = new SuperDateInstance(el, opts.format, opts.timeFormat, opts.dateTimeDelimiter);
     el[INSTANCE_KEY] = instance;
     return instance;

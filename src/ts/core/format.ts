@@ -67,7 +67,7 @@ export function buildDateTimeFormat(dateFormat: string, timeFormat: string, deli
 
 export function isTimeToken(token: DateToken): boolean {
   return token === 'HH' || token === 'H' || token === 'hh' || token === 'h'
-      || token === 'mm' || token === 'ss';
+    || token === 'mm' || token === 'ss';
 }
 
 export function isDateToken(token: DateToken): boolean {
@@ -80,74 +80,74 @@ export function tokenValue(token: DateToken, date: Date | null): string {
   if (!date) return '';
   switch (token) {
     // ── Date ──
-    case 'dd':   return pad(date.getDate(), 2);
-    case 'd':    return String(date.getDate());
-    case 'MM':   return pad(date.getMonth() + 1, 2);
-    case 'M':    return String(date.getMonth() + 1);
+    case 'dd': return pad(date.getDate(), 2);
+    case 'd': return String(date.getDate());
+    case 'MM': return pad(date.getMonth() + 1, 2);
+    case 'M': return String(date.getMonth() + 1);
     case 'yyyy': return pad(date.getFullYear(), 4);
-    case 'yy':   return pad(date.getFullYear() % 100, 2);
+    case 'yy': return pad(date.getFullYear() % 100, 2);
     // ── Time ──
-    case 'HH':   return pad(date.getHours(), 2);
-    case 'H':    return String(date.getHours());
-    case 'hh':   return pad(to12h(date.getHours()), 2);
-    case 'h':    return String(to12h(date.getHours()));
-    case 'mm':   return pad(date.getMinutes(), 2);
-    case 'ss':   return pad(date.getSeconds(), 2);
+    case 'HH': return pad(date.getHours(), 2);
+    case 'H': return String(date.getHours());
+    case 'hh': return pad(to12h(date.getHours()), 2);
+    case 'h': return String(to12h(date.getHours()));
+    case 'mm': return pad(date.getMinutes(), 2);
+    case 'ss': return pad(date.getSeconds(), 2);
   }
 }
 
 export function tokenPlaceholder(token: DateToken): string {
   switch (token) {
-    case 'dd':   return 'dd';
-    case 'd':    return 'd';
-    case 'MM':   return 'mm';
-    case 'M':    return 'm';
+    case 'dd': return 'dd';
+    case 'd': return 'd';
+    case 'MM': return 'mm';
+    case 'M': return 'm';
     case 'yyyy': return 'yyyy';
-    case 'yy':   return 'yy';
-    case 'HH':   return 'HH';
-    case 'H':    return 'H';
-    case 'hh':   return 'hh';
-    case 'h':    return 'h';
-    case 'mm':   return 'mm';
-    case 'ss':   return 'ss';
+    case 'yy': return 'yy';
+    case 'HH': return 'HH';
+    case 'H': return 'H';
+    case 'hh': return 'hh';
+    case 'h': return 'h';
+    case 'mm': return 'mm';
+    case 'ss': return 'ss';
   }
 }
 
 export function tokenMaxDigits(token: DateToken): number {
   switch (token) {
-    case 'dd': case 'd':                      return 2;
-    case 'MM': case 'M':                      return 2;
-    case 'yyyy':                              return 4;
-    case 'yy':                               return 2;
+    case 'dd': case 'd': return 2;
+    case 'MM': case 'M': return 2;
+    case 'yyyy': return 4;
+    case 'yy': return 2;
     case 'HH': case 'H': case 'hh': case 'h': return 2;
-    case 'mm':                               return 2;
-    case 'ss':                               return 2;
+    case 'mm': return 2;
+    case 'ss': return 2;
   }
 }
 
 export function tokenMaxValue(token: DateToken): number {
   switch (token) {
-    case 'dd': case 'd':   return 31;
-    case 'MM': case 'M':   return 12;
-    case 'yyyy':           return 9999;
-    case 'yy':             return 99;
-    case 'HH': case 'H':   return 23;
-    case 'hh': case 'h':   return 12;
-    case 'mm':             return 59;
-    case 'ss':             return 59;
+    case 'dd': case 'd': return 31;
+    case 'MM': case 'M': return 12;
+    case 'yyyy': return 9999;
+    case 'yy': return 99;
+    case 'HH': case 'H': return 23;
+    case 'hh': case 'h': return 12;
+    case 'mm': return 59;
+    case 'ss': return 59;
   }
 }
 
 export function tokenMinValue(token: DateToken): number {
   switch (token) {
-    case 'dd': case 'd':   return 1;
-    case 'MM': case 'M':   return 1;
-    case 'yyyy':           return 1;
-    case 'yy':             return 0;
-    case 'HH': case 'H':   return 0;
-    case 'hh': case 'h':   return 1;
-    case 'mm':             return 0;
-    case 'ss':             return 0;
+    case 'dd': case 'd': return 1;
+    case 'MM': case 'M': return 1;
+    case 'yyyy': return 1;
+    case 'yy': return 0;
+    case 'HH': case 'H': return 0;
+    case 'hh': case 'h': return 1;
+    case 'mm': return 0;
+    case 'ss': return 0;
   }
 }
 
@@ -164,14 +164,14 @@ export function buildDate(current: Date | null, token: DateToken, newRaw: number
   let s = base.getSeconds();
 
   switch (token) {
-    case 'dd': case 'd':    d  = newRaw; break;
-    case 'MM': case 'M':    mo = newRaw; break;
-    case 'yyyy':            y  = newRaw; break;
-    case 'yy':              y  = 2000 + newRaw; break;
-    case 'HH': case 'H':   h  = newRaw; break;
-    case 'hh': case 'h':   h  = from12h(newRaw, h); break;
-    case 'mm':              mi = newRaw; break;
-    case 'ss':              s  = newRaw; break;
+    case 'dd': case 'd': d = newRaw; break;
+    case 'MM': case 'M': mo = newRaw; break;
+    case 'yyyy': y = newRaw; break;
+    case 'yy': y = 2000 + newRaw; break;
+    case 'HH': case 'H': h = newRaw; break;
+    case 'hh': case 'h': h = from12h(newRaw, h); break;
+    case 'mm': mi = newRaw; break;
+    case 'ss': s = newRaw; break;
   }
 
   // Clamp day to valid range for the given month/year
@@ -250,9 +250,9 @@ function formatDateISO(date: Date): string {
 }
 
 function formatTimeISO(date: Date): string {
-  const h  = pad(date.getHours(), 2);
+  const h = pad(date.getHours(), 2);
   const mi = pad(date.getMinutes(), 2);
-  const s  = pad(date.getSeconds(), 2);
+  const s = pad(date.getSeconds(), 2);
   return `${h}:${mi}:${s}`;
 }
 
@@ -262,8 +262,8 @@ function formatDateTimeISO(date: Date): string {
 
 // ─── Paste parser ─────────────────────────────────────────────────────────────
 
-const PASTE_DATE_FALLBACKS   = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'd.M.yyyy', 'MM-dd-yyyy'];
-const PASTE_TIME_FALLBACKS   = ['HH:mm:ss', 'HH:mm', 'H:mm'];
+const PASTE_DATE_FALLBACKS = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'd.M.yyyy', 'MM-dd-yyyy'];
+const PASTE_TIME_FALLBACKS = ['HH:mm:ss', 'HH:mm', 'H:mm'];
 const PASTE_DATETIME_FALLBACKS = ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm', 'dd/MM/yyyy HH:mm'];
 
 /**
@@ -276,9 +276,9 @@ export function parsePastedDate(
   kind: InputKind = 'date',
 ): Date | null {
   let fallbacks: string[];
-  if (kind === 'time')           fallbacks = PASTE_TIME_FALLBACKS;
+  if (kind === 'time') fallbacks = PASTE_TIME_FALLBACKS;
   else if (kind === 'datetime-local') fallbacks = PASTE_DATETIME_FALLBACKS;
-  else                           fallbacks = PASTE_DATE_FALLBACKS;
+  else fallbacks = PASTE_DATE_FALLBACKS;
 
   const formats = [preferredFormat, ...fallbacks.filter(f => f !== preferredFormat)];
   for (const fmt of formats) {
@@ -310,14 +310,14 @@ function parseWithFormat(text: string, format: string, kind: InputKind): Date | 
     if (!chunk) return null;
     const num = parseInt(chunk, 10);
     switch (seg.token) {
-      case 'dd': case 'd':    d  = num; break;
-      case 'MM': case 'M':    mo = num; break;
-      case 'yyyy':            y  = num; break;
-      case 'yy':              y  = 2000 + num; break;
-      case 'HH': case 'H':   h  = num; break;
-      case 'hh': case 'h':   h  = from12h(num, h); break;
-      case 'mm':              mi = num; break;
-      case 'ss':              s  = num; break;
+      case 'dd': case 'd': d = num; break;
+      case 'MM': case 'M': mo = num; break;
+      case 'yyyy': y = num; break;
+      case 'yy': y = 2000 + num; break;
+      case 'HH': case 'H': h = num; break;
+      case 'hh': case 'h': h = from12h(num, h); break;
+      case 'mm': mi = num; break;
+      case 'ss': s = num; break;
     }
   }
 
@@ -339,7 +339,7 @@ export function pad(n: number, len: number): string {
 
 function to12h(h24: number): number {
   if (h24 === 0) return 12;
-  if (h24 > 12)  return h24 - 12;
+  if (h24 > 12) return h24 - 12;
   return h24;
 }
 
