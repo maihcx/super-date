@@ -16,6 +16,7 @@ input.superdate-input {
 .superdate-wrapper {
   position: relative;
   display: inline-block;
+  width: fit-content;
 }
 
 /* The visible overlay */

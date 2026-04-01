@@ -50,7 +50,6 @@ export function buildOverlay(
 
   input.classList.add('superdate-input');
   input.style.display = 'block';
-  input.style.width = '100%';
   input.style.boxSizing = 'border-box';
 
   // ── Overlay ──────────────────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ export function buildOverlay(
   overlay.className = 'superdate-overlay';
 
   const segEls: HTMLElement[] = [];
-  
+
   segments.forEach((seg, i) => {
     const el = document.createElement('span');
     el.className = 'superdate-seg';

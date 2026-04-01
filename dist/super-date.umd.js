@@ -404,7 +404,6 @@
         wrapper.appendChild(input);
         input.classList.add('superdate-input');
         input.style.display = 'block';
-        input.style.width = '100%';
         input.style.boxSizing = 'border-box';
         // ── Overlay ──────────────────────────────────────────────────────────────────
         const overlay = document.createElement('div');
@@ -565,7 +564,8 @@
             if (this.activeTokenIdx !== -1) {
                 const token = this.segments[this.activeTokenIdx].token;
                 if (token) {
-                    if (this.getBufferValue(token) == '0') {
+                    let bufferVal = this.getBufferValue(token);
+                    if (bufferVal == '0') {
                         const now = new Date();
                         let nowValue;
                         switch (token) {
@@ -598,8 +598,19 @@
                                 nowValue = now.getSeconds();
                                 break;
                         }
+                        nowValue = nowValue.toString();
+                        if (nowValue.length < tokenMaxDigits(token)) {
+                            nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
+                        }
                         this.typingBuffer = '';
-                        this.typeDigit(token, nowValue.toString());
+                        this.typeDigit(token, nowValue, true);
+                    }
+                    else {
+                        if (bufferVal.length < tokenMaxDigits(token)) {
+                            bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+                            this.typingBuffer = '';
+                            this.typeDigit(token, bufferVal, true);
+                        }
                     }
                     const date = readInputDate(this.input);
                     if (date) {
@@ -872,7 +883,7 @@
             }
         }
         // ── Digit typing ──────────────────────────────────────────────────────────
-        typeDigit(token, digit) {
+        typeDigit(token, digit, skipNext = false) {
             this.typingBuffer += digit;
             const num = parseInt(this.typingBuffer, 10);
             const maxVal = tokenMaxValue(token);
@@ -883,9 +894,11 @@
                 const clamped = Math.max(minVal, Math.min(maxVal, num));
                 this.commitTokenValue(token, clamped);
                 this.typingBuffer = '';
-                const next = this.nextTokenIdx(this.activeTokenIdx, 1);
-                if (next !== -1)
-                    setTimeout(() => this.activateSegment(next), 0);
+                if (!skipNext) {
+                    const next = this.nextTokenIdx(this.activeTokenIdx, 1);
+                    if (next !== -1)
+                        setTimeout(() => this.activateSegment(next), 0);
+                }
             }
             else {
                 this.renderBuffer();
