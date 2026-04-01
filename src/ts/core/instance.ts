@@ -151,6 +151,39 @@ export class SuperDateInstance {
 
   // ── Segment activation ───────────────────────────────────────────────────────
 
+  private verifySegment(token: DateToken): void {
+    let bufferVal = this.getBufferValue(token);
+      if (bufferVal == '0') {
+        const now = new Date();
+        let nowValue: number | string;
+        switch (token) {
+          case 'dd': case 'd': nowValue = now.getDate(); break;
+          case 'MM': case 'M': nowValue = now.getMonth() + 1; break;
+          case 'yyyy': nowValue = now.getFullYear(); break;
+          case 'yy': nowValue = now.getFullYear() % 100; break;
+          case 'HH': case 'H': nowValue = now.getHours(); break;
+          case 'hh': case 'h': nowValue = now.getHours() % 12 || 12; break;
+          case 'mm': nowValue = now.getMinutes(); break;
+          case 'ss': nowValue = now.getSeconds(); break;
+        }
+        nowValue = nowValue.toString();
+        if (nowValue.length < tokenMaxDigits(token)) {
+          nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
+        }
+
+        this.typingBuffer = '';
+        this.typeDigit(token, nowValue, true);
+      }
+      else if (bufferVal != '') {
+        if (bufferVal.length < tokenMaxDigits(token)) {
+          bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+
+          this.typingBuffer = '';
+          this.typeDigit(token, bufferVal, true);
+        }
+      }
+  }
+
   private activateSegment(idx: number): void {
     if (idx < 0 || idx >= this.segments.length) return;
     if (!this.segments[idx].token) return;
@@ -167,36 +200,7 @@ export class SuperDateInstance {
     if (this.activeTokenIdx !== -1) {
       const token = this.segments[this.activeTokenIdx].token;
       if (token) {
-        let bufferVal = this.getBufferValue(token);
-        if (bufferVal == '0') {
-          const now = new Date();
-          let nowValue: number | string;
-          switch (token) {
-            case 'dd': case 'd': nowValue = now.getDate(); break;
-            case 'MM': case 'M': nowValue = now.getMonth() + 1; break;
-            case 'yyyy': nowValue = now.getFullYear(); break;
-            case 'yy': nowValue = now.getFullYear() % 100; break;
-            case 'HH': case 'H': nowValue = now.getHours(); break;
-            case 'hh': case 'h': nowValue = now.getHours() % 12 || 12; break;
-            case 'mm': nowValue = now.getMinutes(); break;
-            case 'ss': nowValue = now.getSeconds(); break;
-          }
-          nowValue = nowValue.toString();
-          if (nowValue.length < tokenMaxDigits(token)) {
-            nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
-          }
-
-          this.typingBuffer = '';
-          this.typeDigit(token, nowValue, true);
-        }
-        else if (bufferVal != '') {
-          if (bufferVal.length < tokenMaxDigits(token)) {
-            bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
-
-            this.typingBuffer = '';
-            this.typeDigit(token, bufferVal, true);
-          }
-        }
+        this.verifySegment(token);
 
         const date = readInputDate(this.input);
         if (date) {
@@ -254,6 +258,9 @@ export class SuperDateInstance {
   }
 
   private endSelection(): void {
+    if (this.activeTokenIdx !== -1) {
+      this.verifySegment(this.segments[this.activeTokenIdx].token);
+    }
     this.selAnchor = -1;
     this.selEnd = -1;
     deactivateAll(this.segEls);

@@ -548,6 +548,56 @@
             return -1;
         }
         // ── Segment activation ───────────────────────────────────────────────────────
+        verifySegment(token) {
+            let bufferVal = this.getBufferValue(token);
+            if (bufferVal == '0') {
+                const now = new Date();
+                let nowValue;
+                switch (token) {
+                    case 'dd':
+                    case 'd':
+                        nowValue = now.getDate();
+                        break;
+                    case 'MM':
+                    case 'M':
+                        nowValue = now.getMonth() + 1;
+                        break;
+                    case 'yyyy':
+                        nowValue = now.getFullYear();
+                        break;
+                    case 'yy':
+                        nowValue = now.getFullYear() % 100;
+                        break;
+                    case 'HH':
+                    case 'H':
+                        nowValue = now.getHours();
+                        break;
+                    case 'hh':
+                    case 'h':
+                        nowValue = now.getHours() % 12 || 12;
+                        break;
+                    case 'mm':
+                        nowValue = now.getMinutes();
+                        break;
+                    case 'ss':
+                        nowValue = now.getSeconds();
+                        break;
+                }
+                nowValue = nowValue.toString();
+                if (nowValue.length < tokenMaxDigits(token)) {
+                    nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
+                }
+                this.typingBuffer = '';
+                this.typeDigit(token, nowValue, true);
+            }
+            else if (bufferVal != '') {
+                if (bufferVal.length < tokenMaxDigits(token)) {
+                    bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+                    this.typingBuffer = '';
+                    this.typeDigit(token, bufferVal, true);
+                }
+            }
+        }
         activateSegment(idx) {
             if (idx < 0 || idx >= this.segments.length)
                 return;
@@ -564,54 +614,7 @@
             if (this.activeTokenIdx !== -1) {
                 const token = this.segments[this.activeTokenIdx].token;
                 if (token) {
-                    let bufferVal = this.getBufferValue(token);
-                    if (bufferVal == '0') {
-                        const now = new Date();
-                        let nowValue;
-                        switch (token) {
-                            case 'dd':
-                            case 'd':
-                                nowValue = now.getDate();
-                                break;
-                            case 'MM':
-                            case 'M':
-                                nowValue = now.getMonth() + 1;
-                                break;
-                            case 'yyyy':
-                                nowValue = now.getFullYear();
-                                break;
-                            case 'yy':
-                                nowValue = now.getFullYear() % 100;
-                                break;
-                            case 'HH':
-                            case 'H':
-                                nowValue = now.getHours();
-                                break;
-                            case 'hh':
-                            case 'h':
-                                nowValue = now.getHours() % 12 || 12;
-                                break;
-                            case 'mm':
-                                nowValue = now.getMinutes();
-                                break;
-                            case 'ss':
-                                nowValue = now.getSeconds();
-                                break;
-                        }
-                        nowValue = nowValue.toString();
-                        if (nowValue.length < tokenMaxDigits(token)) {
-                            nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
-                        }
-                        this.typingBuffer = '';
-                        this.typeDigit(token, nowValue, true);
-                    }
-                    else if (bufferVal != '') {
-                        if (bufferVal.length < tokenMaxDigits(token)) {
-                            bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
-                            this.typingBuffer = '';
-                            this.typeDigit(token, bufferVal, true);
-                        }
-                    }
+                    this.verifySegment(token);
                     const date = readInputDate(this.input);
                     if (date) {
                         let current;
@@ -682,6 +685,9 @@
             this.paintSelection(first, last);
         }
         endSelection() {
+            if (this.activeTokenIdx !== -1) {
+                this.verifySegment(this.segments[this.activeTokenIdx].token);
+            }
             this.selAnchor = -1;
             this.selEnd = -1;
             deactivateAll(this.segEls);
