@@ -1,3 +1,13 @@
+## v0.1.1
+
+## 🚀 Changelog
+## 🐛 Bug Fixes
+
+- bufferVal is not bypassed correctly. (#11) — @maihcx
+
+
+---
+
 ## v0.1.0
 
 ## 🚀 Changelog
