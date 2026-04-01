@@ -1,6 +1,6 @@
 {
   "name": "super-date",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "An overlay for the date input element in HTML.",
   "author": "Huỳnh Công Xuân Mai",
   "license": "MIT",
