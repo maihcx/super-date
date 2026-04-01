@@ -189,7 +189,7 @@ export class SuperDateInstance {
           this.typingBuffer = '';
           this.typeDigit(token, nowValue, true);
         }
-        else {
+        else if (bufferVal != '') {
           if (bufferVal.length < tokenMaxDigits(token)) {
             bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
 

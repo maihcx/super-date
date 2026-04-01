@@ -1,4 +1,4 @@
-/*! SuperDate v0.0.0 | MIT License */
+/*! SuperDate v0.1.0 | MIT License */
 /**
  * format.ts — format string parsing, token metadata, and date/time read/write helpers.
  */
@@ -599,7 +599,7 @@ class SuperDateInstance {
                     this.typingBuffer = '';
                     this.typeDigit(token, nowValue, true);
                 }
-                else {
+                else if (bufferVal != '') {
                     if (bufferVal.length < tokenMaxDigits(token)) {
                         bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
                         this.typingBuffer = '';
@@ -1175,7 +1175,7 @@ class SuperDateRegistry {
  */
 /** Singleton registry — the default export used in most projects. */
 const SuperDate = new SuperDateRegistry();
-SuperDate.version = "0.0.0";
+SuperDate.version = "0.1.0";
 SuperDate.name = "SuperDate";
 
 export { SuperDate as default };
