@@ -1,6 +1,6 @@
 {
   "name": "super-date",
-  "version": "1.3.0",
+  "version": "0.0.0",
   "description": "An overlay for the date input element in HTML.",
   "author": "Huỳnh Công Xuân Mai",
   "license": "MIT",
@@ -47,12 +47,11 @@
     "typescript": "^6.0.2"
   },
   "keywords": [
-    "select",
+    "date",
     "dropdown",
     "ui",
     "component",
-    "custom-select",
-    "searchable-select"
+    "custom-date"
   ],
   "browserslist": [
     ">0.25%",
