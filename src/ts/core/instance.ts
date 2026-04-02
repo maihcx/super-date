@@ -64,6 +64,7 @@ export class SuperDateInstance {
   private _onPaste: (e: Event) => void;
   private _onChange: () => void;
   private _onBlur: (e: Event) => void;
+  private _onFocus: (e: Event) => void;
   private _onWrapClick: (e: Event) => void;
   private _onWrapDblClick: (e: Event) => void;
   private _onMouseDown: (e: Event) => void;
@@ -110,6 +111,7 @@ export class SuperDateInstance {
     this._onPaste = (e) => this.handlePaste(e as ClipboardEvent);
     this._onChange = () => this.render();
     this._onBlur = (e) => this.handleBlur(e as FocusEvent);
+    this._onFocus = (e) => this.handleFocus(e as FocusEvent);
     this._onWrapClick = (e) => this.handleWrapperClick(e as MouseEvent);
     this._onWrapDblClick = (e) => this.handleWrapperDblClick(e as MouseEvent);
     this._onMouseDown = (e) => this.handleMouseDown(e as MouseEvent);
@@ -347,13 +349,17 @@ export class SuperDateInstance {
     this.input.focus({ preventScroll: true });
   }
 
-  // ── Blur / wrapper click ─────────────────────────────────────────────────
+  // ── Blur / Focus / wrapper click ─────────────────────────────────────────────────
 
   private handleBlur(e: FocusEvent): void {
     const related = e.relatedTarget as Node | null;
     if (!related || !this.wrapper.contains(related)) {
       this.deactivate();
     }
+  }
+
+  private handleFocus(e: FocusEvent): void {
+    this.activateSegment(0);
   }
 
   private handleWrapperClick(e: MouseEvent): void {
@@ -553,6 +559,7 @@ export class SuperDateInstance {
     this.input.addEventListener('paste', this._onPaste);
     this.input.addEventListener('change', this._onChange);
     this.input.addEventListener('blur', this._onBlur);
+    this.input.addEventListener('focus', this._onFocus);
 
     this.wrapper.addEventListener('click', this._onWrapClick);
     this.wrapper.addEventListener('dblclick', this._onWrapDblClick);
