@@ -19,6 +19,8 @@
 ## 🚀 Changelog
 ## 🐛 Bug Fixes
 
+- remove &nbsp (#15) — @maihcx
+- The segments do not re-validate their own data. (#13) — @maihcx
 - bufferVal is not bypassed correctly. (#11) — @maihcx
 
 
