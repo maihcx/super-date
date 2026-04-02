@@ -1,3 +1,19 @@
+## v0.3.0
+
+## 🚀 Changelog
+## 🚀 Features
+
+-  Activate the first segment as soon as you focus on the input tag (#26) — @maihcx
+- Public to NPM (#25) — @maihcx
+
+## 🐛 Bug Fixes
+
+- Auto public error (#29) — @maihcx
+- Reactivate the first segment after deleting it (#24) — @maihcx
+
+
+---
+
 ## v0.2.0
 
 ## 🚀 Changelog
