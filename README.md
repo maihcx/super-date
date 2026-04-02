@@ -19,7 +19,7 @@ Supports `input[type="date"]`, `input[type="time"]`, and `input[type="datetime-l
 ## Install
 
 ```bash
-npm install superdate   # if published
+npm install @maihcx/super-date
 # or copy dist/ into your project
 ```
 
