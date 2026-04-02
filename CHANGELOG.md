@@ -1,3 +1,19 @@
+## v0.2.0
+
+## 🚀 Changelog
+- Auto build updated (#20) — @maihcx
+
+## 🚀 Features
+
+- Optimization & Update the delete-input operation. (#17) — @maihcx
+
+## ⚡ Performance
+
+- Optimization & Update the delete-input operation. (#17) — @maihcx
+
+
+---
+
 ## v0.1.1
 
 ## 🚀 Changelog

@@ -1,4 +1,4 @@
-/*! SuperDate v0.1.0 | MIT License */
+/*! SuperDate v0.2.0 | MIT License */
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
@@ -1077,7 +1077,7 @@
         globalThis.GLOBAL_SDATE = new SuperDateRegistry();
     }
     var SuperDate = globalThis.GLOBAL_SDATE;
-    SuperDate.version = "0.1.0";
+    SuperDate.version = "0.2.0";
     SuperDate.name = "SuperDate";
 
     return SuperDate;
