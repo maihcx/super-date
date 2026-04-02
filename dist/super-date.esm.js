@@ -1,4 +1,4 @@
-/*! SuperDate v0.3.1 | MIT License */
+/*! SuperDate v0.3.2 | MIT License */
 /**
  * format.ts — format string parsing, token metadata, and date/time read/write helpers.
  */
@@ -723,7 +723,9 @@ class SuperDateInstance {
         }
     }
     handleFocus(e) {
-        this.activateSegment(0);
+        if (this.activeTokenIdx === -1 && this.selAnchor === -1) {
+            this.activateSegment(0);
+        }
     }
     handleWrapperClick(e) {
         if (this._justDragged) {
@@ -1076,7 +1078,7 @@ class SuperDateRegistry {
  */
 /** Singleton registry — the default export used in most projects. */
 const SuperDate = new SuperDateRegistry();
-SuperDate.version = "0.3.1";
+SuperDate.version = "0.3.2";
 SuperDate.name = "SuperDate";
 
 export { SuperDate as default };

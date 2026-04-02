@@ -1,3 +1,13 @@
+## v0.3.2
+
+## 🚀 Changelog
+## 🐛 Bug Fixes
+
+- The currently selected segments are suddenly reset (#40) — @maihcx
+
+
+---
+
 ## v0.3.1
 
 ## 🚀 Changelog

@@ -1,4 +1,4 @@
-/*! SuperDate v0.3.1 | MIT License */
+/*! SuperDate v0.3.2 | MIT License */
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
@@ -729,7 +729,9 @@
             }
         }
         handleFocus(e) {
-            this.activateSegment(0);
+            if (this.activeTokenIdx === -1 && this.selAnchor === -1) {
+                this.activateSegment(0);
+            }
         }
         handleWrapperClick(e) {
             if (this._justDragged) {
@@ -1085,7 +1087,7 @@
         globalThis.GLOBAL_SDATE = new SuperDateRegistry();
     }
     var SuperDate = globalThis.GLOBAL_SDATE;
-    SuperDate.version = "0.3.1";
+    SuperDate.version = "0.3.2";
     SuperDate.name = "SuperDate";
 
     return SuperDate;
