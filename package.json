@@ -1,5 +1,5 @@
 {
-  "name": "super-date",
+  "name": "@maihcx/super-date",
   "version": "0.3.0",
   "description": "Lightweight TypeScript enhancer for native date, time, and datetime-local inputs.",
   "author": "Huỳnh Công Xuân Mai",
