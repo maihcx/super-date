@@ -1,4 +1,4 @@
-/*! SuperDate v0.3.0 | MIT License */
+/*! SuperDate v0.3.1 | MIT License */
 /**
  * format.ts — format string parsing, token metadata, and date/time read/write helpers.
  */
@@ -1076,7 +1076,7 @@ class SuperDateRegistry {
  */
 /** Singleton registry — the default export used in most projects. */
 const SuperDate = new SuperDateRegistry();
-SuperDate.version = "0.3.0";
+SuperDate.version = "0.3.1";
 SuperDate.name = "SuperDate";
 
 export { SuperDate as default };

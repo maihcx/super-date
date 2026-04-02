@@ -1,3 +1,13 @@
+## v0.3.1
+
+## 🚀 Changelog
+## 🐛 Bug Fixes
+
+- Fix UMD min not work properly (#35) — @maihcx
+
+
+---
+
 ## v0.3.0
 
 ## 🚀 Changelog
