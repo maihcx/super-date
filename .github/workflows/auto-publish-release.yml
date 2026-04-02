@@ -73,7 +73,7 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-          git add CHANGELOG.md package.json package-lock.json dist/
+          git add CHANGELOG.md package.json package-lock.json
           git add -f dist/
           git commit -m "chore(release): v$VERSION" || exit 0
 
