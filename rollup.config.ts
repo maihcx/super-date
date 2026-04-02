@@ -36,6 +36,7 @@ const DATA_PROPERTIES = [
   'dateFormat',
   'timeFormat',
   'dateTimeDelimiter',
+  'dd', 'd', 'MM', 'M', 'yyyy', 'yy', 'HH', 'H', 'hh', 'h', 'mm', 'ss',
 ];
 
 const PUBLIC_PROPERTIES = [
