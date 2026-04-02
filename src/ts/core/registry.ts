@@ -14,6 +14,8 @@ let bindings: BindEntry[] = [];
 const DESTROYED_ATTR = 'data-superdate-destroyed';
 const SUPPORTED_TYPES = new Set(['date', 'time', 'datetime-local']);
 
+// ── Destroyed-marker helpers ──────────────────────────────────────────────────
+
 function isDestroyed(el: HTMLInputElement): boolean {
   return el.hasAttribute(DESTROYED_ATTR);
 }
@@ -28,6 +30,8 @@ function clearDestroyedBySelector(selector: string): void {
   });
 }
 
+// ── Options normalisation ─────────────────────────────────────────────────────
+
 function defaultOpts(options: SuperDateOptions = {}): Required<SuperDateOptions> {
   return {
     format: options.format ?? 'dd/MM/yyyy',
@@ -37,38 +41,40 @@ function defaultOpts(options: SuperDateOptions = {}): Required<SuperDateOptions>
   };
 }
 
+// ── Initialisation helpers ────────────────────────────────────────────────────
+
+function createInstance(el: HTMLInputElement, opts: Required<SuperDateOptions>): void {
+  el[INSTANCE_KEY] = new SuperDateInstance(
+    el,
+    opts.format,
+    opts.timeFormat,
+    opts.dateTimeDelimiter,
+  );
+}
+
+function canInit(el: HTMLInputElement): boolean {
+  return SUPPORTED_TYPES.has(el.type) && !el[INSTANCE_KEY] && !isDestroyed(el);
+}
+
 function initAll(selector: string, opts: Required<SuperDateOptions>): void {
   document.querySelectorAll<HTMLInputElement>(selector).forEach(el => {
-    if (!SUPPORTED_TYPES.has(el.type) || el[INSTANCE_KEY] || isDestroyed(el)) return;
-    el[INSTANCE_KEY] = new SuperDateInstance(
-      el,
-      opts.format,
-      opts.timeFormat,
-      opts.dateTimeDelimiter,
-    );
+    if (canInit(el)) createInstance(el, opts);
   });
 }
 
+/**
+ * Try to initialise any input in `node` (or node itself) against all
+ * registered bindings. Called from the MutationObserver callback.
+ */
 function tryInit(node: Element): void {
   for (const binding of bindings) {
-    if (node instanceof HTMLInputElement && node.matches(binding.selector)) {
-      if (SUPPORTED_TYPES.has(node.type) && !node[INSTANCE_KEY] && !isDestroyed(node)) {
-        node[INSTANCE_KEY] = new SuperDateInstance(
-          node,
-          binding.options.format,
-          binding.options.timeFormat,
-          binding.options.dateTimeDelimiter,
-        );
-      }
+    // Direct match
+    if (node instanceof HTMLInputElement && node.matches(binding.selector) && canInit(node)) {
+      createInstance(node, binding.options);
     }
+    // Descendant matches
     node.querySelectorAll<HTMLInputElement>(binding.selector).forEach(el => {
-      if (!SUPPORTED_TYPES.has(el.type) || el[INSTANCE_KEY] || isDestroyed(el)) return;
-      el[INSTANCE_KEY] = new SuperDateInstance(
-        el,
-        binding.options.format,
-        binding.options.timeFormat,
-        binding.options.dateTimeDelimiter,
-      );
+      if (canInit(el)) createInstance(el, binding.options);
     });
   }
 }
@@ -81,9 +87,10 @@ function startObserver(): void {
       }
     }
   });
-
   observer.observe(document.body, { childList: true, subtree: true });
 }
+
+// ── Public registry ───────────────────────────────────────────────────────────
 
 export class SuperDateRegistry {
 
@@ -91,9 +98,8 @@ export class SuperDateRegistry {
   public name: string = '';
 
   /**
-   * Bind SuperDate to all current **and future** `<input type="date">`,
-   * `<input type="time">`, and `<input type="datetime-local">` elements
-   * matching `selector`. Safe to call multiple times with different selectors.
+   * Bind SuperDate to all current **and future** matching inputs.
+   * Safe to call multiple times with different selectors.
    */
   bind(selector: string, options: SuperDateOptions = {}): this {
     const opts = defaultOpts(options);
@@ -115,7 +121,6 @@ export class SuperDateRegistry {
     if (el[INSTANCE_KEY]) return el[INSTANCE_KEY]!;
 
     el.removeAttribute(DESTROYED_ATTR);
-
     const opts = defaultOpts(options);
     const instance = new SuperDateInstance(el, opts.format, opts.timeFormat, opts.dateTimeDelimiter);
     el[INSTANCE_KEY] = instance;
