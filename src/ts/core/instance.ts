@@ -417,6 +417,9 @@ export class SuperDateInstance {
           s--;
         }
       }
+      else if (selAnchor == 0) {
+        this.activateSegment(selAnchor);
+      }
 
       this.deleteSelection();
       return;
