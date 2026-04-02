@@ -359,7 +359,9 @@ export class SuperDateInstance {
   }
 
   private handleFocus(e: FocusEvent): void {
-    this.activateSegment(0);
+    if (this.activeTokenIdx === -1 && this.selAnchor === -1) {
+      this.activateSegment(0);
+    }
   }
 
   private handleWrapperClick(e: MouseEvent): void {
