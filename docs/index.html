@@ -325,6 +325,29 @@ npm run build</code></pre>
           </tbody>
         </table>
       </div>
+
+      <h2>CDN (jsDelivr)</h2>
+      <p>No installation needed — load SuperDate directly via jsDelivr. Use the <code>@latest</code> tag to always receive the newest version automatically:</p>
+
+      <h3>Always use the latest version <span style="color:var(--green);font-size:0.8rem;font-weight:400">✦ recommended</span></h3>
+<pre><code><span class="tok-cmt">&lt;!-- CSS --&gt;</span>
+<span class="tok-tag">&lt;link</span> <span class="tok-attr">rel</span>=<span class="tok-val">"stylesheet"</span>
+      <span class="tok-attr">href</span>=<span class="tok-val">"https://cdn.jsdelivr.net/npm/@maihcx/super-date@latest/dist/super-date.min.css"</span> <span class="tok-tag">/&gt;</span>
+
+<span class="tok-cmt">&lt;!-- JS (UMD — exposes global SuperDate) --&gt;</span>
+<span class="tok-tag">&lt;script</span> <span class="tok-attr">src</span>=<span class="tok-val">"https://cdn.jsdelivr.net/npm/@maihcx/super-date@latest/dist/super-date.min.js"</span><span class="tok-tag">&gt;&lt;/script&gt;</span></code></pre>
+
+      <h3>Pin a specific version</h3>
+      <p>If you need stricter stability guarantees for production, replace <code>@latest</code> with an exact version number:</p>
+<pre><code><span class="tok-tag">&lt;link</span> <span class="tok-attr">rel</span>=<span class="tok-val">"stylesheet"</span>
+      <span class="tok-attr">href</span>=<span class="tok-val">"https://cdn.jsdelivr.net/npm/@maihcx/super-date@1.0.0/dist/super-date.min.css"</span> <span class="tok-tag">/&gt;</span>
+<span class="tok-tag">&lt;script</span> <span class="tok-attr">src</span>=<span class="tok-val">"https://cdn.jsdelivr.net/npm/@maihcx/super-date@1.0.0/dist/super-date.min.js"</span><span class="tok-tag">&gt;&lt;/script&gt;</span></code></pre>
+
+      <h3>ESM via jsDelivr</h3>
+<pre><code><span class="tok-tag">&lt;script</span> <span class="tok-attr">type</span>=<span class="tok-val">"module"</span><span class="tok-tag">&gt;</span>
+  <span class="tok-kw">import</span> SuperDate <span class="tok-kw">from</span> <span class="tok-str">'https://cdn.jsdelivr.net/npm/@maihcx/super-date@latest/dist/super-date.esm.min.js'</span>;
+  SuperDate.<span class="tok-fn">bind</span>(<span class="tok-str">'.sd'</span>, { format: <span class="tok-str">'dd/MM/yyyy'</span> });
+<span class="tok-tag">&lt;/script&gt;</span></code></pre>
     </section>
 
     <!-- USAGE -->
