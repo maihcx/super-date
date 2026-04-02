@@ -16,10 +16,13 @@ import {
   tokenMaxValue,
   tokenMinValue,
   tokenValue,
+  tokenPlaceholder,
+  tokenCurrentValue,
   buildDate,
   readInputDate,
   writeInputDate,
   parsePastedDate,
+  pad,
 } from './format';
 import {
   buildOverlay,
@@ -78,18 +81,14 @@ export class SuperDateInstance {
     this.input = input;
     this.kind = getInputKind(input);
 
-    // Resolve effective formats from data-attributes or globals
     const dateFormat = input.dataset.dateFormat ?? globalDateFormat;
     const timeFormat = input.dataset.timeFormat ?? globalTimeFormat;
     const delimiter = input.dataset.dateTimeDelimiter ?? globalDelimiter;
 
-    if (this.kind === 'datetime-local') {
-      this.format = buildDateTimeFormat(dateFormat, timeFormat, delimiter);
-    } else if (this.kind === 'time') {
-      this.format = timeFormat;
-    } else {
-      this.format = dateFormat;
-    }
+    this.format =
+      this.kind === 'datetime-local' ? buildDateTimeFormat(dateFormat, timeFormat, delimiter) :
+        this.kind === 'time' ? timeFormat :
+          dateFormat;
 
     this.segments = parseFormat(this.format);
 
@@ -151,37 +150,38 @@ export class SuperDateInstance {
 
   // ── Segment activation ───────────────────────────────────────────────────────
 
-  private verifySegment(token: DateToken): void {
-    let bufferVal = this.getBufferValue(token);
-      if (bufferVal == '0') {
-        const now = new Date();
-        let nowValue: number | string;
-        switch (token) {
-          case 'dd': case 'd': nowValue = now.getDate(); break;
-          case 'MM': case 'M': nowValue = now.getMonth() + 1; break;
-          case 'yyyy': nowValue = now.getFullYear(); break;
-          case 'yy': nowValue = now.getFullYear() % 100; break;
-          case 'HH': case 'H': nowValue = now.getHours(); break;
-          case 'hh': case 'h': nowValue = now.getHours() % 12 || 12; break;
-          case 'mm': nowValue = now.getMinutes(); break;
-          case 'ss': nowValue = now.getSeconds(); break;
-        }
-        nowValue = nowValue.toString();
-        if (nowValue.length < tokenMaxDigits(token)) {
-          nowValue = nowValue.padStart(tokenMaxDigits(token), '0');
-        }
+  /**
+   * Validate and normalise the buffer for the given segment index.
+   * - Empty buffer ("0" or no input) → fills with today's value.
+   * - Partial numeric buffer → left-pads to maxDigits.
+   * - Year buffer shorter than 4 digits → prepend century from today.
+   */
+  private verifySegment(idx: number): void {
+    const token = this.segments[idx].token;
+    if (!token) return;
 
-        this.typingBuffer = '';
-        this.typeDigit(token, nowValue, true);
-      }
-      else if (bufferVal != '') {
-        if (bufferVal.length < tokenMaxDigits(token)) {
-          bufferVal = bufferVal.padStart(tokenMaxDigits(token), '0');
+    let bufferVal = this.getBufferValue(idx);
+    const maxDigits = tokenMaxDigits(token);
+    const nowValue = pad(tokenCurrentValue(token, new Date()), maxDigits);
 
+    if (bufferVal === '0') {
+      this.typingBuffer = '';
+      this.typeDigit(token, nowValue, true);
+    } else if (bufferVal !== '') {
+      if (maxDigits <= 2) {
+        if (bufferVal.length < maxDigits) {
+          bufferVal = bufferVal.padStart(maxDigits, '0');
           this.typingBuffer = '';
           this.typeDigit(token, bufferVal, true);
         }
+      } else {
+        // Year: prepend leading digits from today
+        this.typingBuffer = '';
+        const needle = maxDigits - bufferVal.length;
+        bufferVal = `${nowValue.substring(0, needle)}${bufferVal}`;
+        this.typeDigit(token, bufferVal, true);
       }
+    }
   }
 
   private activateSegment(idx: number): void {
@@ -196,26 +196,15 @@ export class SuperDateInstance {
   }
 
   private deactivate(): void {
-    // Snap segment value up to minValue if it went below (e.g. 0 → 1 for day/month)
     if (this.activeTokenIdx !== -1) {
       const token = this.segments[this.activeTokenIdx].token;
       if (token) {
-        this.verifySegment(token);
+        this.verifySegment(this.activeTokenIdx);
 
         const date = readInputDate(this.input);
         if (date) {
-          let current: number;
-          switch (token) {
-            case 'dd': case 'd': current = date.getDate(); break;
-            case 'MM': case 'M': current = date.getMonth() + 1; break;
-            case 'yyyy': current = date.getFullYear(); break;
-            case 'yy': current = date.getFullYear() % 100; break;
-            case 'HH': case 'H': current = date.getHours(); break;
-            case 'hh': case 'h': current = date.getHours() % 12 || 12; break;
-            case 'mm': current = date.getMinutes(); break;
-            case 'ss': current = date.getSeconds(); break;
-          }
-          if (current! < tokenMinValue(token)) {
+          const current = tokenCurrentValue(token, date);
+          if (current < tokenMinValue(token)) {
             this.commitTokenValue(token, tokenMinValue(token));
           }
         }
@@ -259,7 +248,7 @@ export class SuperDateInstance {
 
   private endSelection(): void {
     if (this.activeTokenIdx !== -1) {
-      this.verifySegment(this.segments[this.activeTokenIdx].token);
+      this.verifySegment(this.activeTokenIdx);
     }
     this.selAnchor = -1;
     this.selEnd = -1;
@@ -293,25 +282,18 @@ export class SuperDateInstance {
   }
 
   private deleteSelection(): void {
-    if (!this.hasSelection()) return;
+    // Check if every token segment is already empty
+    const isEmpty = this.segments.every(
+      (seg, i) => !seg.token || this.getBufferValue(i) === '',
+    );
 
-    const from = Math.min(this.selAnchor, this.selEnd);
-    const to = Math.max(this.selAnchor, this.selEnd);
-    const allTokenCount = this.segments.filter(s => s.token).length;
-    let selTokenCount = 0;
-    for (let i = from; i <= to; i++) {
-      if (this.segments[i]?.token) selTokenCount++;
-    }
-
-    if (selTokenCount === allTokenCount) {
+    if (isEmpty) {
       this.input.value = '';
       this.input.dispatchEvent(new Event('input', { bubbles: true }));
       this.input.dispatchEvent(new Event('change', { bubbles: true }));
       this.render();
+      this.activeTokenIdx = -1;
     }
-
-    this.endSelection();
-    this.activeTokenIdx = -1;
   }
 
   // ── Mouse drag ───────────────────────────────────────────────────────────
@@ -334,8 +316,7 @@ export class SuperDateInstance {
   private handleMouseMove(e: MouseEvent): void {
     if (this.selAnchor === -1 || !(e.buttons & 1)) return;
     const idx = this.tokenIdxFromEvent(e);
-    if (idx === -1) return;
-    if (idx === this.selEnd) return;
+    if (idx === -1 || idx === this.selEnd) return;
 
     if (this.activeTokenIdx !== -1) {
       this.activeTokenIdx = -1;
@@ -390,13 +371,15 @@ export class SuperDateInstance {
   // ── Keyboard ──────────────────────────────────────────────────────────────
 
   private handleKeyDown(e: KeyboardEvent): void {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && e.key === 'a') {
       e.preventDefault();
       this.selectAll();
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    if (mod && e.key === 'c') {
       if (this.hasSelection()) {
         e.preventDefault();
         this.copySelection();
@@ -404,18 +387,38 @@ export class SuperDateInstance {
       return;
     }
 
-    if ((e.key === 'Backspace' || e.key === 'Delete') && this.hasSelection()) {
-      e.preventDefault();
-      this.deleteSelection();
+    if (e.key === 'Escape') {
+      this.hasSelection() ? this.endSelection() : this.deactivate();
       return;
     }
 
-    if (e.key === 'Escape') {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      this.typingBuffer = '';
+      let selAnchor = -1;
+
       if (this.hasSelection()) {
+        selAnchor = this.selAnchor;
+        for (let i = selAnchor; i <= this.selEnd; i++) {
+          if (this.segments[i]?.token) {
+            this.renderBuffer(i);
+          }
+        }
         this.endSelection();
-      } else {
-        this.deactivate();
+      } else if (this.activeTokenIdx !== -1) {
+        if (this.getBufferValue(this.activeTokenIdx) === '') selAnchor = this.activeTokenIdx;
+        this.renderBuffer();
       }
+
+      if (selAnchor > 0) {
+        let s = selAnchor - 1;
+        while (s >= 0) {
+          if (this.segments[s]?.token) { this.activateSegment(s); break; }
+          s--;
+        }
+      }
+
+      this.deleteSelection();
       return;
     }
 
@@ -427,14 +430,18 @@ export class SuperDateInstance {
       case 'Tab':
         this.handleTab(e);
         break;
-      case 'ArrowRight':
+      case 'ArrowRight': {
         e.preventDefault();
-        { const n = this.nextTokenIdx(this.activeTokenIdx, 1); if (n !== -1) this.activateSegment(n); }
+        const n = this.nextTokenIdx(this.activeTokenIdx, 1);
+        if (n !== -1) this.activateSegment(n);
         break;
-      case 'ArrowLeft':
+      }
+      case 'ArrowLeft': {
         e.preventDefault();
-        { const p = this.nextTokenIdx(this.activeTokenIdx, -1); if (p !== -1) this.activateSegment(p); }
+        const p = this.nextTokenIdx(this.activeTokenIdx, -1);
+        if (p !== -1) this.activateSegment(p);
         break;
+      }
       case 'ArrowUp':
         e.preventDefault();
         this.stepValue(token, +1);
@@ -442,12 +449,6 @@ export class SuperDateInstance {
       case 'ArrowDown':
         e.preventDefault();
         this.stepValue(token, -1);
-        break;
-      case 'Backspace':
-      case 'Delete':
-        e.preventDefault();
-        this.typingBuffer = this.typingBuffer.slice(0, -1);
-        this.renderBuffer();
         break;
       default:
         if (/^\d$/.test(e.key)) {
@@ -476,9 +477,7 @@ export class SuperDateInstance {
     const maxVal = tokenMaxValue(token);
     const maxDigit = tokenMaxDigits(token);
 
-    const fullLength = this.typingBuffer.length >= maxDigit;
-
-    if (fullLength) {
+    if (this.typingBuffer.length >= maxDigit) {
       const minVal = tokenMinValue(token);
       const clamped = Math.max(minVal, Math.min(maxVal, num));
       this.commitTokenValue(token, clamped);
@@ -492,37 +491,22 @@ export class SuperDateInstance {
     }
   }
 
-  private renderBuffer(): void {
-    const el = this.segEls[this.activeTokenIdx];
-    const token = this.segments[this.activeTokenIdx].token!;
+  private renderBuffer(activeTokenIdx: number = this.activeTokenIdx): void {
+    const el = this.segEls[activeTokenIdx];
+    const token = this.segments[activeTokenIdx].token!;
     if (this.typingBuffer) {
       el.textContent = this.typingBuffer;
       el.classList.remove('empty');
     } else {
-      // Restore placeholder
-      switch (token) {
-        case 'yyyy': el.textContent = 'yyyy'; break;
-        case 'yy': el.textContent = 'yy'; break;
-        case 'MM': el.textContent = 'mm'; break;
-        case 'M': el.textContent = 'm'; break;
-        case 'dd': el.textContent = 'dd'; break;
-        case 'd': el.textContent = 'd'; break;
-        case 'HH': el.textContent = 'HH'; break;
-        case 'H': el.textContent = 'H'; break;
-        case 'hh': el.textContent = 'hh'; break;
-        case 'h': el.textContent = 'h'; break;
-        case 'mm': el.textContent = 'mm'; break;
-        case 'ss': el.textContent = 'ss'; break;
-      }
+      el.textContent = tokenPlaceholder(token);
       el.classList.add('empty');
     }
   }
 
-  private getBufferValue(token: DateToken): string {
+  private getBufferValue(activeTokenIdx: number): string {
     if (this.typingBuffer) return this.typingBuffer;
-    const date = readInputDate(this.input);
-    if (!date) return '';
-    return tokenValue(token, date);
+    const el = this.segEls[activeTokenIdx];
+    return el.classList.contains('empty') ? '' : (el.textContent ?? '');
   }
 
   // ── Step (↑ ↓) ────────────────────────────────────────────────────────────
@@ -530,22 +514,10 @@ export class SuperDateInstance {
   private stepValue(token: DateToken, delta: number): void {
     const date = readInputDate(this.input);
     const base = date ?? new Date();
-    let current: number;
-
-    switch (token) {
-      case 'dd': case 'd': current = base.getDate(); break;
-      case 'MM': case 'M': current = base.getMonth() + 1; break;
-      case 'yyyy': current = base.getFullYear(); break;
-      case 'yy': current = base.getFullYear() % 100; break;
-      case 'HH': case 'H': current = base.getHours(); break;
-      case 'hh': case 'h': current = base.getHours() % 12 || 12; break;
-      case 'mm': current = base.getMinutes(); break;
-      case 'ss': current = base.getSeconds(); break;
-    }
-
+    const current = tokenCurrentValue(token, base);
     const minV = tokenMinValue(token);
     const maxV = tokenMaxValue(token);
-    let next = current! + delta;
+    let next = current + delta;
 
     if (next < minV) next = maxV;
     if (next > maxV) next = minV;
