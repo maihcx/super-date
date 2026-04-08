@@ -325,6 +325,7 @@ export class SuperDateInstance {
       this.typingBuffer = '';
     }
     this.extendSelectionTo(idx);
+    this.input.focus({ preventScroll: true });
   }
 
   private handleMouseUp(_e: MouseEvent): void {
