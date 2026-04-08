@@ -65,6 +65,7 @@ export class SuperDateInstance {
   private _onChange: () => void;
   private _onBlur: (e: Event) => void;
   private _onFocus: (e: Event) => void;
+  private _onWrapMouseDown: (e: Event) => void;
   private _onWrapClick: (e: Event) => void;
   private _onWrapDblClick: (e: Event) => void;
   private _onMouseDown: (e: Event) => void;
@@ -112,6 +113,7 @@ export class SuperDateInstance {
     this._onChange = () => this.render();
     this._onBlur = (e) => this.handleBlur(e as FocusEvent);
     this._onFocus = (e) => this.handleFocus(e as FocusEvent);
+    this._onWrapMouseDown = (e) => this.handleWrapperMouseDown(e as MouseEvent);
     this._onWrapClick = (e) => this.handleWrapperClick(e as MouseEvent);
     this._onWrapDblClick = (e) => this.handleWrapperDblClick(e as MouseEvent);
     this._onMouseDown = (e) => this.handleMouseDown(e as MouseEvent);
@@ -324,6 +326,7 @@ export class SuperDateInstance {
       this.activeTokenIdx = -1;
       this.typingBuffer = '';
     }
+    this._justDragged = true;
     this.extendSelectionTo(idx);
     this.input.focus({ preventScroll: true });
   }
@@ -365,9 +368,14 @@ export class SuperDateInstance {
     }
   }
 
+  private handleWrapperMouseDown(e: MouseEvent): void {
+    this._justDragged = false;
+  }
+
   private handleWrapperClick(e: MouseEvent): void {
     if (this._justDragged) {
       this._justDragged = false;
+      this.input.focus({ preventScroll: true });
       return;
     }
     const target = e.target as HTMLElement;
@@ -564,6 +572,7 @@ export class SuperDateInstance {
     this.input.addEventListener('blur', this._onBlur);
     this.input.addEventListener('focus', this._onFocus);
 
+    this.wrapper.addEventListener('mousedown', this._onWrapMouseDown);
     this.wrapper.addEventListener('click', this._onWrapClick);
     this.wrapper.addEventListener('dblclick', this._onWrapDblClick);
     this.overlay.addEventListener('mousedown', this._onMouseDown);
