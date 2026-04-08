@@ -1,3 +1,23 @@
+## v0.3.3
+
+## 🚀 Changelog
+## 🐛 Bug Fixes
+
+- The segments are reset to active state while the mouse is dragging (#43) — @maihcx
+- Not focusing properly on the input while dragging (#42) — @maihcx
+
+## 📚 Documentation
+
+- Show version on DOCS (#44) — @maihcx
+
+## 🧹 Maintenance
+
+- Deleted DIST (#46) — @maihcx
+- Fix the version number for the development branch (#45) — @maihcx
+
+
+---
+
 ## v0.3.2
 
 ## 🚀 Changelog
