@@ -189,6 +189,7 @@
       border-radius: var(--radius);
       margin: 0.75rem 0 1.25rem;
       font-size: 0.875rem;
+      align-items: center;
     }
     .callout.info  { background: rgba(56,189,248,0.08);  border: 1px solid rgba(56,189,248,0.2);  color: #93c5fd; }
     .callout.warn  { background: rgba(251,191,36,0.08);  border: 1px solid rgba(251,191,36,0.2);  color: #fde68a; }
@@ -305,6 +306,11 @@
       </div>
       <p>SuperDate replaces the native browser date/time picker chrome with a fully custom, format-aware overlay — while still delegating the actual popup calendar or clock to the OS. You never re-implement a calendar widget.</p>
       <p>The underlying <code>input.value</code> always stays in standard ISO format, so it drops in alongside any existing form logic without changes.</p>
+      
+      <div class="callout tip">
+        <span class="callout-icon">✦</span>
+        <div>Current version: <code id="versionView">##Unknown##</code></div>
+      </div>
     </section>
 
     <!-- INSTALL -->
@@ -640,6 +646,8 @@ SuperDate.<span class="tok-fn">init</span>(el, {
       timeFormat:        'HH:mm',
       dateTimeDelimiter: ' ',
     });
+
+    document.getElementById('versionView').textContent = `v${SuperDate.version}`;
   });
 
   // Active nav link on scroll
