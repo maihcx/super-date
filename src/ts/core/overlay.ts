@@ -36,7 +36,6 @@ export interface OverlayElements {
 export function buildOverlay(
   input: HTMLInputElement,
   segments: Segment[],
-  onSegmentClick: (idx: number) => void,
   onIconClick: () => void,
   kind: InputKind = 'date',
 ): OverlayElements {
@@ -68,7 +67,6 @@ export function buildOverlay(
       el.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        onSegmentClick(i);
       });
     }
     overlay.appendChild(el);
