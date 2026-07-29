@@ -66,6 +66,7 @@ export function buildOverlay(
       el.dataset.idx = String(i);
       el.setAttribute('tabindex', '-1');
       el.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         onSegmentClick(i);
       });
