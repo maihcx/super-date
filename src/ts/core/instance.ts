@@ -97,7 +97,6 @@ export class SuperDateInstance {
     const elements = buildOverlay(
       input,
       this.segments,
-      (idx) => this.activateSegment(idx),
       () => this.input.showPicker?.(),
       this.kind,
     );
@@ -332,15 +331,22 @@ export class SuperDateInstance {
   }
 
   private handleMouseUp(_e: MouseEvent): void {
-    if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
+    if (this.selAnchor === -1) return;
+
+    if (this.selAnchor === this.selEnd) {
       const idx = this.selAnchor;
       this.selAnchor = -1;
       this.selEnd = -1;
       this.activateSegment(idx);
-    } else if (this.selAnchor !== this.selEnd) {
-      this._justDragged = true;
-      this.input.focus({ preventScroll: true });
+      return;
     }
+
+    this._justDragged = true;
+    this.input.focus({ preventScroll: true });
+
+    setTimeout(() => {
+      this._justDragged = false;
+    }, 0);
   }
 
   // ── Double-click ─────────────────────────────────────────────────────────
@@ -374,12 +380,16 @@ export class SuperDateInstance {
 
   private handleWrapperClick(e: MouseEvent): void {
     if (this._justDragged) {
-      this._justDragged = false;
       this.input.focus({ preventScroll: true });
       return;
     }
     const target = e.target as HTMLElement;
-    if (target === this.wrapper || target === this.input || target === this.overlay) {
+
+    if (
+      target === this.wrapper ||
+      target === this.input ||
+      target === this.overlay
+    ) {
       this.endSelection();
       this.activateSegment(this.firstTokenIdx());
     }
