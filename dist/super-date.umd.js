@@ -398,7 +398,7 @@
      * Wrap `input` in a `.superdate-wrapper`, inject the overlay element and
      * segment spans. Returns references to every created element.
      */
-    function buildOverlay(input, segments, onSegmentClick, onIconClick, kind = 'date') {
+    function buildOverlay(input, segments, onIconClick, kind = 'date') {
         // ── Wrapper ─────────────────────────────────────────────────────────────────
         const wrapper = document.createElement('div');
         wrapper.className = 'superdate-wrapper';
@@ -422,7 +422,6 @@
                 el.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onSegmentClick(i);
                 });
             }
             overlay.appendChild(el);
@@ -497,7 +496,7 @@
                     this.kind === 'time' ? timeFormat :
                         dateFormat;
             this.segments = parseFormat(this.format);
-            const elements = buildOverlay(input, this.segments, (idx) => this.activateSegment(idx), () => this.input.showPicker?.(), this.kind);
+            const elements = buildOverlay(input, this.segments, () => this.input.showPicker?.(), this.kind);
             this.wrapper = elements.wrapper;
             this.overlay = elements.overlay;
             this.segEls = elements.segEls;
@@ -706,16 +705,20 @@
             this.input.focus({ preventScroll: true });
         }
         handleMouseUp(_e) {
-            if (this.selAnchor !== -1 && this.selAnchor === this.selEnd) {
+            if (this.selAnchor === -1)
+                return;
+            if (this.selAnchor === this.selEnd) {
                 const idx = this.selAnchor;
                 this.selAnchor = -1;
                 this.selEnd = -1;
                 this.activateSegment(idx);
+                return;
             }
-            else if (this.selAnchor !== this.selEnd) {
-                this._justDragged = true;
-                this.input.focus({ preventScroll: true });
-            }
+            this._justDragged = true;
+            this.input.focus({ preventScroll: true });
+            setTimeout(() => {
+                this._justDragged = false;
+            }, 0);
         }
         // ── Double-click ─────────────────────────────────────────────────────────
         handleWrapperDblClick(e) {
@@ -742,12 +745,13 @@
         }
         handleWrapperClick(e) {
             if (this._justDragged) {
-                this._justDragged = false;
                 this.input.focus({ preventScroll: true });
                 return;
             }
             const target = e.target;
-            if (target === this.wrapper || target === this.input || target === this.overlay) {
+            if (target === this.wrapper ||
+                target === this.input ||
+                target === this.overlay) {
                 this.endSelection();
                 this.activateSegment(this.firstTokenIdx());
             }
