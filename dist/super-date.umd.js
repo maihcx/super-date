@@ -1,4 +1,4 @@
-/*! SuperDate v0.3.3 | MIT License */
+/*! SuperDate v0.3.4 | MIT License */
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
@@ -420,6 +420,7 @@
                 el.dataset.idx = String(i);
                 el.setAttribute('tabindex', '-1');
                 el.addEventListener('click', (e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     onSegmentClick(i);
                 });
@@ -1095,7 +1096,7 @@
         globalThis.GLOBAL_SDATE = new SuperDateRegistry();
     }
     var SuperDate = globalThis.GLOBAL_SDATE;
-    SuperDate.version = "0.3.3";
+    SuperDate.version = "0.3.4";
     SuperDate.name = "SuperDate";
 
     return SuperDate;

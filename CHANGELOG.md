@@ -1,3 +1,13 @@
+## v0.3.4
+
+## 🚀 Changelog
+## 🐛 Bug Fixes
+
+- segment race condition (#48) — @maihcx
+
+
+---
+
 ## v0.3.3
 
 ## 🚀 Changelog

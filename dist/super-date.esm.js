@@ -1,4 +1,4 @@
-/*! SuperDate v0.3.3 | MIT License */
+/*! SuperDate v0.3.4 | MIT License */
 /**
  * format.ts — format string parsing, token metadata, and date/time read/write helpers.
  */
@@ -414,6 +414,7 @@ function buildOverlay(input, segments, onSegmentClick, onIconClick, kind = 'date
             el.dataset.idx = String(i);
             el.setAttribute('tabindex', '-1');
             el.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onSegmentClick(i);
             });
@@ -1086,7 +1087,7 @@ class SuperDateRegistry {
  */
 /** Singleton registry — the default export used in most projects. */
 const SuperDate = new SuperDateRegistry();
-SuperDate.version = "0.3.3";
+SuperDate.version = "0.3.4";
 SuperDate.name = "SuperDate";
 
 export { SuperDate as default };
